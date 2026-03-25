@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Portal — Wireframes</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,system-ui,sans-serif;background:#f5f5f5;color:#1a1a1a;font-size:14px;line-height:1.5}
+
+/* Wireframe page switcher (not part of design) */
+.sw{position:sticky;top:0;z-index:99;background:#fff;border-bottom:1px solid #ddd;display:flex;gap:2px;padding:8px 12px;overflow-x:auto}
+.sw button{background:none;border:1px solid transparent;padding:5px 12px;border-radius:5px;font-size:12px;cursor:pointer;color:#666;white-space:nowrap;font-weight:500}
+.sw button:hover{background:#eee}
+.sw button.on{background:#222;color:#fff}
+.pg{display:none}.pg.on{display:block}
+
+/* Top nav */
+.nav{background:#fff;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:46px;position:sticky;top:42px;z-index:10}
+.nav .logo{font-weight:700;font-size:15px;color:#111;margin-right:24px;flex-shrink:0}
+.nav .links{display:flex;gap:2px;overflow-x:auto}
+.nav .links a{padding:6px 12px;font-size:13px;color:#666;text-decoration:none;border-radius:5px;white-space:nowrap}
+.nav .links a:hover{background:#f0f0f0;color:#333}
+.nav .links a.on{color:#111;font-weight:600;background:#f0f0f0}
+.nav .right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.av{width:26px;height:26px;border-radius:50%;background:#222;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
+
+.wr{padding:20px;max-width:960px;margin:0 auto}
+
+/* Components */
+.cd{background:#fff;border:1px solid #ddd;border-radius:6px;margin-bottom:12px}
+.cd-h{padding:10px 14px;border-bottom:1px solid #eee;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.cd-b{padding:14px}
+
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.st{background:#fff;border:1px solid #ddd;border-radius:6px;padding:14px}
+.st .v{font-size:22px;font-weight:700}.st .l{font-size:11px;color:#999;margin-top:1px}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:#999;border-bottom:1px solid #ddd;font-weight:600;background:#fafafa}
+td{padding:8px 10px;border-bottom:1px solid #f0f0f0}
+tr:hover td{background:#fafafa}
+
+.b{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:600}
+.b-ok{background:#dcfce7;color:#16a34a}.b-err{background:#fee2e2;color:#dc2626}.b-warn{background:#fef3c7;color:#d97706}.b-info{background:#e0e7ff;color:#4f46e5}.b-m{background:#f0f0f0;color:#666}
+
+.btn{display:inline-flex;align-items:center;padding:5px 12px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid transparent}
+.btn-d{background:#222;color:#fff}.btn-d:hover{background:#444}
+.btn-l{background:#fff;color:#333;border-color:#ccc}.btn-l:hover{background:#f5f5f5}
+.btn-g{background:none;border:none;color:#999;padding:3px 6px;font-size:11px;cursor:pointer}.btn-g:hover{color:#111}
+
+.fi{padding:6px 9px;border:1px solid #ccc;border-radius:5px;font-size:13px;background:#fff;outline:none;width:100%}
+.fi:focus{border-color:#222}
+select.fi{appearance:auto}
+.fg{margin-bottom:10px}
+.fl{display:block;font-size:10px;font-weight:600;color:#666;margin-bottom:3px;text-transform:uppercase;letter-spacing:.3px}
+
+.code{background:#1e1e2e;border-radius:5px;padding:12px;font-family:monospace;font-size:12px;line-height:1.7;color:#cdd6f4;overflow-x:auto}
+.kw{color:#cba6f7}.pm{color:#f9e2af}.cm{color:#585b70;font-style:italic}
+
+.log{background:#1a1a2e;border-radius:5px;padding:10px;font-family:monospace;font-size:11px;line-height:1.8;color:#888;max-height:160px;overflow-y:auto}
+.log .e{color:#f87171}.log .i{color:#60a5fa}.log .t{color:#555}
+
+.pbar{height:5px;background:#e0e0e0;border-radius:99px;overflow:hidden;margin-bottom:10px}.pfill{height:100%;background:#222;border-radius:99px}
+
+.drop{border:2px dashed #ccc;border-radius:6px;padding:28px;text-align:center;cursor:pointer;font-size:13px;color:#888}
+.drop:hover{border-color:#222;background:#fafafa}
+
+.rc{background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;cursor:pointer}
+.rc:hover{border-color:#999}
+
+.pills{display:flex;gap:3px;margin-bottom:10px}.pill{padding:3px 10px;border-radius:99px;font-size:11px;cursor:pointer;border:1px solid #ddd;background:#fff;color:#666}.pill.on{background:#222;color:#fff;border-color:#222}
+
+.tags{display:flex;flex-wrap:wrap;gap:3px;padding:4px;border:1px solid #ccc;border-radius:5px}
+.tag{background:#e0e7ff;color:#4f46e5;padding:1px 7px;border-radius:3px;font-size:11px}
+
+.bold{font-weight:600}.sm{font-size:12px}.mu{color:#999;font-size:12px}
+.mt{margin-top:12px}.mb{margin-bottom:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.sec{font-size:13px;font-weight:600;margin:14px 0 8px}
+.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap}
+.bar-l{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+@media(max-width:768px){.g4,.g2{grid-template-columns:1fr}.nav .links{display:none}}
+</style>
+</head>
+<body>
+
+<div class="sw">
+  <button class="on" onclick="go(0)">1. Dashboard</button>
+  <button onclick="go(1)">2. Datasets</button>
+  <button onclick="go(2)">3. Templates</button>
+  <button onclick="go(3)">4. Export Config</button>
+  <button onclick="go(4)">5. Export</button>
+  <button onclick="go(5)">6. Scheduler</button>
+  <button onclick="go(6)">7. Users</button>
+  <button onclick="go(7)">8. History</button>
+</div>
+
+<!-- ===== 1. DASHBOARD ===== -->
+<div class="pg on">
+<div class="nav">
+  <div style="display:flex;align-items:center">
+    <div class="logo">Data Portal</div>
+    <div class="links">
+      <a class="on" href="#">Dashboard</a>
+      <a href="#">Datasets</a>
+      <a href="#">Templates</a>
+      <a href="#">Export Configs</a>
+      <a href="#">Export</a>
+      <a href="#">Schedulers</a>
+      <a href="#">Users</a>
+      <a href="#">History</a>
+    </div>
+  </div>
+  <div class="right"><div class="av">AD</div></div>
+</div>
+<div class="wr">
+  <div class="g4">
+    <div class="st"><div class="v">42</div><div class="l">Datasets</div></div>
+    <div class="st"><div class="v">18</div><div class="l">Templates</div></div>
+    <div class="st"><div class="v">1,247</div><div class="l">Exports</div></div>
+    <div class="st"><div class="v">12</div><div class="l">Schedulers</div></div>
+  </div>
+  <div class="cd">
+    <div class="cd-h">Export gan day</div>
+    <table>
+      <thead><tr><th>Config</th><th>User</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody>
+        <tr><td class="bold">Doanh thu T1/2024</td><td>Nguyen A</td><td><span class="b b-ok">Success</span></td><td class="mu">2m ago</td></tr>
+        <tr><td class="bold">KPI Monthly</td><td>System</td><td><span class="b b-ok">Success</span></td><td class="mu">15m ago</td></tr>
+        <tr><td class="bold">HR Report Q4</td><td>Tran B</td><td><span class="b b-err">Failed</span></td><td class="mu">1h ago</td></tr>
+        <tr><td class="bold">Inventory Weekly</td><td>System</td><td><span class="b b-ok">Success</span></td><td class="mu">3h ago</td></tr>
+        <tr><td class="bold">Revenue Summary</td><td>Le C</td><td><span class="b b-ok">Success</span></td><td class="mu">5h ago</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ===== 2. DATASETS ===== -->
+<div class="pg">
+<div class="nav">
+  <div style="display:flex;align-items:center">
+    <div class="logo">Data Portal</div>
+    <div class="links">
+      <a href="#">Dashboard</a>
+      <a class="on" href="#">Datasets</a>
+      <a href="#">Templates</a>
+      <a href="#">Export Configs</a>
+      <a href="#">Export</a>
+      <a href="#">Schedulers</a>
+      <a href="#">Users</a>
+      <a href="#">History</a>
+    </div>
+  </div>
+  <div class="right"><div class="av">DA</div></div>
+</div>
+<div class="wr">
+  <div class="bar">
+    <input class="fi" placeholder="Search datasets..." style="width:220px">
+    <button class="btn btn-d">+ New Dataset</button>
+  </div>
+  <div class="cd mb">
+    <table>
+      <thead><tr><th>Name</th><th>Database</th><th>Status</th><th>Used In</th><th>Modified</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="bold">Doanh thu Phong Ban</td><td><span class="b b-info">PostgreSQL</span></td><td><span class="b b-ok">Active</span></td><td>5</td><td class="mu">Jan 20</td><td><button class="btn-g">Edit</button> <button class="btn-g">Del</button></td></tr>
+        <tr><td class="bold">KPI Tong hop Thang</td><td><span class="b b-info">PostgreSQL</span></td><td><span class="b b-ok">Active</span></td><td>3</td><td class="mu">Jan 18</td><td><button class="btn-g">Edit</button> <button class="btn-g">Del</button></td></tr>
+        <tr><td class="bold">Nhan vien Chi Nhanh</td><td><span class="b b-m">MySQL</span></td><td><span class="b b-warn">Inactive</span></td><td>1</td><td class="mu">Jan 10</td><td><button class="btn-g">Edit</button> <button class="btn-g">Del</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec">Create / Edit Dataset</div>
+  <div class="cd">
+    <div class="cd-b">
+      <div class="g2 mb">
+        <div class="fg"><label class="fl">Name</label><input class="fi" value="Doanh thu Phong Ban"></div>
+        <div class="fg"><label class="fl">Database</label><select class="fi"><option>PostgreSQL - Production</option></select></div>
+      </div>
+      <div class="fg"><label class="fl">Description</label><input class="fi" value="Revenue by department"></div>
+      <div class="fg mt"><label class="fl">SQL Query</label>
+        <div class="code"><span class="cm">-- Revenue by department</span>
+<span class="kw">SELECT</span> order_id, customer_name, amount, order_date
+<span class="kw">FROM</span> orders
+<span class="kw">WHERE</span> order_date <span class="kw">BETWEEN</span> <span class="pm">{{start_date}}</span> <span class="kw">AND</span> <span class="pm">{{end_date}}</span>
+  <span class="kw">AND</span> department = <span class="pm">{{department}}</span>
+<span class="kw">ORDER BY</span> order_date <span class="kw">DESC</span></div>
+      </div>
+      <div class="fg mt"><label class="fl">Filter Parameters (auto-detected)</label>
+        <table>
+          <thead><tr><th>Parameter</th><th>Label</th><th>Type</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td><code style="background:#e0e7ff;padding:1px 5px;border-radius:3px;font-size:11px;color:#4f46e5">start_date</code></td><td>Tu ngay</td><td>Date</td><td>-30 days</td></tr>
+            <tr><td><code style="background:#e0e7ff;padding:1px 5px;border-radius:3px;font-size:11px;color:#4f46e5">end_date</code></td><td>Den ngay</td><td>Date</td><td>today</td></tr>
+            <tr><td><code style="background:#e0e7ff;padding:1px 5px;border-radius:3px;font-size:11px;color:#4f46e5">department</code></td><td>Phong ban</td><td>Select</td><td>ALL</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:12px">
+        <button class="btn btn-l">Preview</button>
+        <button class="btn btn-d">Save</button>
+      </div>
+      <div style="background:#f5f5f5;border-radius:5px;padding:8px 12px;margin-top:12px">
+        <div class="mu" style="color:#16a34a;font-weight:500;margin-bottom:6px">OK — 0.34s — 50 of 15,420 rows</div>
+        <table>
+          <thead><tr><th>order_id</th><th>customer_name</th><th>amount</th><th>order_date</th></tr></thead>
+          <tbody>
+            <tr><td>1001</td><td>Nguyen Van A</td><td>500,000</td><td>2024-01-15</td></tr>
+            <tr><td>1002</td><td>Tran Thi B</td><td>750,000</td><td>2024-01-16</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== 3. TEMPLATES ===== -->
+<div class="pg">
+<div class="nav">
+  <div style="display:flex;align-items:center">
+    <div class="logo">Data Portal</div>
+    <div class="links">
+      <a href="#">Dashboard</a>
+      <a href="#">Datasets</a>
+      <a class="on" href="#">Templates</a>
+      <a href="#">Export Configs</a>
+      <a href="#">Export</a>
+      <a href="#">Schedulers</a>
+      <a href="#">Users</a>
+      <a href="#">History</a>
+    </div>
+  </div>
+  <div class="right"><div class="av">DA</div></div>
+</div>
+<div class="wr">
+  <div class="bar">
+    <input class="fi" placeholder="Search templates..." style="width:220px">
+    <button class="btn btn-d">+ Upload Template</button>
+  </div>
+  <div class="cd mb">
+    <table>
+      <thead><tr><th>Name</th><th>File</th><th>Sheets</th><th>Version</th><th>Used In</th><th>Uploaded</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="bold">Bao cao Doanh thu</td><td class="mu">report.xlsx · 45KB</td><td>3</td><td><span class="b b-info">v2.1</span></td><td>5</td><td class="mu">Jan 20</td><td><button class="btn-g">DL</button> <button class="btn-g">New Ver</button> <button class="btn-g">Del</button></td></tr>
+        <tr><td class="bold">KPI Monthly</td><td class="mu">kpi.xlsx · 22KB</td><td>1</td><td><span class="b b-info">v1.0</span></td><td>12</td><td class="mu">Jan 15</td><td><button class="btn-g">DL</button> <button class="btn-g">New Ver</button> <button class="btn-g">Del</button></td></tr>
+        <tr><td class="bold">HR Report</td><td class="mu">hr.xlsx · 31KB</td><td>2</td><td><span class="b b-info">v1.2</span></td><td>2</td><td class="mu">Jan 10</td><td><button class="btn-g">DL</button> <button class="btn-g">New Ver</button> <button class="btn-g">Del</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec">Upload Template</div>
+  <div class="cd">
+    <div class="cd-b">
+      <div class="drop mb">Drag & drop Excel file here or click to browse<br><span class="mu">.xlsx, .xls · Max 10MB</span></div>
+      <div class="g2">
+        <div class="fg"><label class="fl">Name</label><input class="fi" placeholder="Template name"></div>
+        <div class="fg"><label class="fl">Description</label><input class="fi" placeholder="Optional description"></div>
+      </div>
+      <button class="btn btn-d mt">Upload</button>
+    </div>
+  </div>
+
+  <div class="sec">Version History — Bao cao Doanh thu</div>
+  <div class="cd">
+    <table>
+      <thead><tr><th>Version</th><th>Date</th><th>Notes</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><span class="b b-info">v2.1</span> <span class="b b-ok" style="font-size:9px">current</span></td><td>Jan 20</td><td>Added Status column</td><td><button class="btn-g">Download</button></td></tr>
+        <tr><td><span class="b b-m">v2.0</span></td><td>Jan 10</td><td>Changed header</td><td><button class="btn-g">Download</button> <button class="btn-g">Revert</button></td></tr>
+        <tr><td><span class="b b-m">v1.0</span></td><td>Dec 01</td><td>Initial</td><td><button class="btn-g">Download</button> <button class="btn-g">Revert</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ===== 4. EXPORT CONFIG ===== -->
+<div class="pg">
+<div class="nav">
+  <div style="display:flex;align-items:center">
+    <div class="logo">Data Portal</div>
+    <div class="links">
+      <a href="#">Dashboard</a>
+      <a href="#">Datasets</a>
+      <a href="#">Templates</a>
+      <a class="on" href="#">Export Configs</a>
+      <a href="#">Export</a>
+      <a href="#">Schedulers</a>
+      <a href="#">Users</a>
+      <a href="#">History</a>
+    </div>
+  </div>
+  <div class="right"><div class="av">DA</div></div>
+</div>
+<div class="wr">
+  <div class="cd">
+    <div class="cd-b">
+      <div class="sec" style="margin-top:0">Basic Info</div>
+      <div class="g2 mb">
+        <div class="fg"><label class="fl">Name</label><input class="fi" value="Bao cao Doanh thu Phong Ban"></div>
+        <div class="fg"><label class="fl">Status</label><select class="fi"><option>Active</option><option>Draft</option></select></div>
+      </div>
+      <div class="fg"><label class="fl">Description</label><input class="fi" value="Monthly revenue report by department"></div>
+
+      <div class="sec">Data Source</div>
+      <div class="g2 mb">
+        <div class="fg"><label class="fl">Dataset</label><select class="fi"><option>Doanh thu Phong Ban</option></select></div>
+        <div class="fg"><label class="fl">Template</label><select class="fi"><option>Bao cao Doanh thu v2.1</option></select></div>
+      </div>
+
+      <div class="sec">Data Mapping</div>
+      <div class="g2 mb">
+        <div class="fg"><label class="fl">Target Sheet</label><select class="fi"><option>Sheet1</option></select></div>
+        <div class="fg"><label class="fl">Start Row</label><input class="fi" value="4" style="width:60px"></div>
+      </div>
+      <div class="fg"><label class="fl">Column Mapping</label>
+        <table>
+          <thead><tr><th>Column</th><th>Field</th><th>Format</th></tr></thead>
+          <tbody>
+            <tr><td><b>A</b></td><td>order_id</td><td>Number</td></tr>
+            <tr><td><b>B</b></td><td>customer_name</td><td>Text</td></tr>
+            <tr><td><b>C</b></td><td>amount</td><td>#,##0</td></tr>
+            <tr><td><b>D</b></td><td>order_date</td><td>DD/MM/YYYY</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="fg mt"><label class="fl">Cell Values</label>
+        <table>
+          <thead><tr><th>Cell</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td><b>B2</b></td><td>{{start_date}}</td></tr>
+            <tr><td><b>D2</b></td><td>{{end_date}}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sec">Filter Defaults</div>
+      <table>
+        <thead><tr><th>Filter</th><th>Default Value</th><th>User Editable</th></tr></thead>
+        <tbody>
+          <tr><td>start_date</td><td>First day of month</td><td>Yes</td></tr>
+          <tr><td>end_date</td><td>Today</td><td>Yes</td></tr>
+          <tr><td>department</td><td>ALL</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec">Access</div>
+      <div class="fg">
+        <div style="font-size:13px;margin-bottom:6px">
+          <label style="cursor:pointer"><input type="radio" name="ac"> All End Users</label>
+          &nbsp;&nbsp;
+          <label style="cursor:pointer"><input type="radio" name="ac" checked> Specific Users/Groups</label>
+        </div>
+        <div class="tags">
+          <span class="tag">Phong Ke toan</span>
+          <span class="tag">Ban Giam doc</span>
+          <span class="tag">Nguyen Van A</span>
+          <input style="border:none;outline:none;flex:1;min-width:80px;font-size:12px" placeholder="Add user or group...">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-top:16px">
+        <button class="btn btn-l">Preview Export</button>
+        <button class="btn btn-d">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== 5. EXPORT (END USER) ===== -->
+<div class="pg">
+<div class="nav">
+  <div style="display:flex;align-items:center">
+    <div class="logo">Data Portal</div>
+    <div class="links">
+      <a href="#">Dashboard</a>
+      <a class="on" href="#">Export</a>
+      <a href="#">History</a>
+    </div>
+  </div>
+  <div class="right"><div class="av">EU</div></div>
+</div>
+<div class="wr">
+  <input class="fi mb" placeholder="Search reports...">
+  <div class="g2">
+    <div>
+      <div class="rc"><div><div class="bold sm">Doanh thu Theo Phong Ban</div><div class="mu">Revenue by department</div></div><button class="btn btn-d" style="font-size:11px;padding:4px 10px">Export</button></div>
+      <div class="rc"><div><div class="bold sm">Tong hop KPI Thang</div><div class="mu">Monthly KPI summary</div></div><button class="btn btn-d" style="font-size:11px;padding:4px 10px">Export</button></div>
+      <div class="rc"><div><div class="bold sm">Nhan Vien Theo Chi Nhanh</div><div class="mu">Employee list by branch</div></div><button class="btn btn-d" style="font-size:11px;padding:4px 10px">Export</button></div>
+    </div>
+    <div>
+      <div class="cd">
+        <div class="cd-h">Export: Doanh thu Phong Ban</div>
+        <div class="cd-b">
+          <div class="fg"><label class="fl">Tu ngay</label><input class="fi" type="date" value="2024-01-01"></div>
+          <div class="fg"><label class="fl">Den ngay</label><input class="fi" type="date" value="2024-01-31"></div>
+          <div class="fg"><label class="fl">Phong ban</label><select class="fi"><option>Tat ca</option><option>Ke toan</option><option>Kinh doanh</option></select></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-l" style="font-size:11px">Reset</button>
+            <button class="btn btn-d" style="flex:1">Xuat file</button>
+          </div>
+        </div>
+      </div>
+      <div class="cd">
+        <div class="cd-h">Dang xu ly...</div>
+        <div class="cd-b">
+          <div class="pbar"><div class="pfill" style="width:65%"></div></div>
+          <div class="sm" style="line-height:1.8">
+            <div style="color:#16a34a">&#10003; Querying (15,420 rows)</div>
+            <div style="color:#16a34a">&#10003; Applying template</div>
+            <div class="bold">&#9678; Writing Excel...</div>
+            <div style="color:#ccc">&#9675; Done</div>
+          </div>
+        </div>
+      </div>
+      <div class="cd" style="border-color:#16a34a">
+        <div class="cd-b" style="text-align:center">
+          <div style="font-size:22px;color:#16a34a">&#10003;</div>
+          <div class="bold">Export thanh cong</div>
+          <div class="mu mb">Doanh_thu_01-2024.xlsx · 15,420 rows · 1.2 MB</div>
+          <button class="btn btn-d">Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== 6. SCHEDULER ===== -->
+<div class="pg">
+<div class="nav">
+  <div style="display:flex;align-items:center">
+    <div class="logo">Data Portal</div>
+    <div class="links">
+      <a href="#">Dashboard</a>
+      <a href="#">Datasets</a>
+      <a href="#">Templates</a>
+      <a href="#">Export Configs</a>
+      <a href="#">Export</a>
+      <a class="on" href="#">Schedulers</a>
+      <a href="#">Users</a>
+      <a href="#">History</a>
+    </div>
+  </div>
+  <div class="right"><div class="av">DA</div></div>
+</div>
+<div class="wr">
+  <div class="bar">
+    <div class="bar-l">
+      <input class="fi" placeholder="Search..." style="width:180px">
+      <select class="fi" style="width:100px"><option>All Status</option></select>
+    </div>
+    <button class="btn btn-d">+ New Scheduler</button>
+  </div>
+  <div class="cd mb">
+    <table>
+      <thead><tr><th>Name</th><th>Config</th><th>Schedule</th><th>Recipients</th><th>Status</th><th>Last Run</th><th>Next</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="bold">Doanh thu Tuan</td><td class="sm">Doanh thu PB</td><td class="sm">Mon 08:00</td><td class="sm">5</td><td><span class="b b-ok">Active</span></td><td class="sm">27/01 <span class="b b-ok" style="font-size:9px">OK</span></td><td class="sm">03/02</td><td><button class="btn-g">Edit</button> <button class="btn-g">Pause</button></td></tr>
+        <tr><td class="bold">KPI Monthly</td><td class="sm">KPI Tong hop</td><td class="sm">1st 09:00</td><td class="sm">12</td><td><span class="b b-ok">Active</span></td><td class="sm">01/01 <span class="b b-ok" style="font-size:9px">OK</span></td><td class="sm">01/02</td><td><button class="btn-g">Edit</button> <button class="btn-g">Pause</button></td></tr>
+        <tr><td class="bold">HR Quarterly</td><td class="sm">NV Chi Nhanh</td><td class="sm">Every 3mo</td><td class="sm">3</td><td><span class="b b-err">Failed</span></td><td class="sm">13/01 <span class="b b-err" style="font-size:9px">ERR</span></td><td class="sm mu">—</td><td><button class="btn-g">Edit</button> <button class="btn-g">Retry</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec">New Scheduler</div>
+  <div class="cd">
+    <div class="cd-b">
+      <div class="g2 mb">
+        <div class="fg"><label class="fl">Name</label><input class="fi" placeholder="Scheduler name"></div>
+        <div class="fg"><label class="fl">Export Config</label><select class="fi"><option>Doanh thu Phong Ban</option></select></div>
+      </div>
+
+      <div class="sec" style="margin-top:0">Schedule</div>
+      <div class="pills mb"><div class="pill">Daily</div><div class="pill on">Weekly</div><div class="pill">Monthly</div></div>
+      <div class="g2 mb">
+        <div class="fg"><label class="fl">Day</label>
+          <div style="display:flex;gap:3px">
+            <button style="width:30px;height:30px;border-radius:50%;border:1px solid #222;background:#222;color:#fff;font-size:10px;cursor:pointer">Mo</button>
+            <button style="width:30px;height:30px;border-radius:50%;border:1px solid #ddd;background:#fff;color:#888;font-size:10px;cursor:pointer">Tu</button>
+            <button style="width:30px;height:30px;border-radius:50%;border:1px solid #ddd;background:#fff;color:#888;font-size:10px;cursor:pointer">We</button>
+            <button style="width:30px;height:30px;border-radius:50%;border:1px solid #ddd;background:#fff;color:#888;font-size:10px;cursor:pointer">Th</button>
+            <button style="width:30px;height:30px;border-radius:50%;border:1px solid #222;background:#222;color:#fff;font-size:10px;cursor:pointer">Fr</button>
+            <button style="width:30px;height:30px;border-radius:50%;border:1px solid #ddd;background:#fff;color:#888;font-size:10px;cursor:pointer">Sa</button>
+            <button style="width:30px;height:30px;border-radius:50%;border:1px solid #ddd;background:#fff;color:#888;font-size:10px;cursor:pointer">Su</button>
+          </div>
+        </div>
+        <div class="fg"><label class="fl">Time</label><input class="fi" type="time" value="08:00" style="width:100px"></div>
+      </div>
+      <div style="background:#f5f5f5;border-radius:5px;padding:8px 12px;margin-bottom:12px">
+        <div class="mu">Next: Mon 03/02 08:00 · Fri 07/02 08:00 · Mon 10/02 08:00</div>
+      </div>
+
+      <div class="sec">Email</div>
+      <div class="fg"><label class="fl">Recipients</label>
+        <div class="tags"><span class="tag">user1@co.com &#10005;</span><span class="tag">user2@co.com &#10005;</span><input style="border:none;outline:none;flex:1;min-width:80px;font-size:12px" placeholder="Add email..."></div>
+      </div>
+      <div class="fg"><label class="fl">Subject</label><input class="fi" value="Bao cao Doanh thu - {{YYYY/MM}}"></div>
+      <div class="fg"><label class="fl">Body</label><textarea class="fi" rows="4" style="font-size:12px">Kinh gui Anh/Chi,
+
+Dinh kem bao cao doanh thu thang {{MM/YYYY}}.
+
+Tran trong,
+Data Portal Team</textarea></div>
+
+      <div style="display:flex;gap:6px;margin-top:12px">
+        <button class="btn btn-l">Send Test</button>
+        <button class="btn btn-d">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">Run History</div>
+  <div class="cd">
+    <table>
+      <thead><tr><th>#</th><th>Time</th><th>Status</th><th>File</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>#45</td><td>27/01 08:00</td><td><span class="b b-ok">Sent</span></td><td>1.2MB</td><td><button class="btn-g">Detail</button></td></tr>
+        <tr><td>#44</td><td>20/01 08:00</td><td><span class="b b-ok">Sent</span></td><td>1.1MB</td><td><button class="btn-g">Detail</button></td></tr>
+        <tr><td>#43</td><td>13/01 08:00</td><td><span class="b b-err">Failed</span></td><td>—</td><td><button class="btn-g">Detail</button> <button class="btn-g">Retry</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ===== 7. USERS ===== -->
+<div class="pg">
+<div class="nav">
+  <div style="display:flex;align-items:center">
+    <div class="logo">Data Portal</div>
+    <div class="links">
+      <a href="#">Dashboard</a>
+      <a href="#">Datasets</a>
+      <a href="#">Templates</a>
+      <a href="#">Export Configs</a>
+      <a href="#">Export</a>
+      <a href="#">Schedulers</a>
+      <a class="on" href="#">Users</a>
+      <a href="#">History</a>
+    </div>
+  </div>
+  <div class="right"><div class="av">AD</div></div>
+</div>
+<div class="wr">
+  <div class="pills mb"><div class="pill on">Users</div><div class="pill">Groups</div></div>
+  <div class="bar">
+    <div class="bar-l">
+      <input class="fi" placeholder="Search users..." style="width:180px">
+      <select class="fi" style="width:100px"><option>All Roles</option><option>Admin</option><option>DA</option><option>End User</option></select>
+    </div>
+    <button class="btn btn-d">+ Add User</button>
+  </div>
+  <div class="cd mb">
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Groups</th><th>Status</th><th>Last Login</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><div style="display:flex;align-items:center;gap:7px"><div class="av">NA</div><span class="bold">Nguyen A</span></div></td>
+          <td class="sm">nguyena@co.com</td><td><span class="b b-info">Admin</span></td><td><span class="b b-m">Ban GD</span></td><td><span class="b b-ok">Active</span></td><td class="mu">2h ago</td>
+          <td><button class="btn-g">Edit</button></td>
+        </tr>
+        <tr>
+          <td><div style="display:flex;align-items:center;gap:7px"><div class="av" style="background:#d97706">TM</div><span class="bold">Tran Minh</span></div></td>
+          <td class="sm">tranminh@co.com</td><td><span class="b b-warn">DA</span></td><td><span class="b b-m">Data</span></td><td><span class="b b-ok">Active</span></td><td class="mu">1d ago</td>
+          <td><button class="btn-g">Edit</button></td>
+        </tr>
+        <tr>
+          <td><div style="display:flex;align-items:center;gap:7px"><div class="av" style="background:#16a34a">LH</div><span class="bold">Le Huong</span></div></td>
+          <td class="sm">lehuong@co.com</td><td><span class="b b-m">End User</span></td><td><span class="b b-m">KT</span> <span class="b b-m">HN</span></td><td><span class="b b-ok">Active</span></td><td class="mu">5h ago</td>
+          <td><button class="btn-g">Edit</button></td>
+        </tr>
+        <tr>
+          <td><div style="display:flex;align-items:center;gap:7px"><div class="av" style="background:#999">PD</div><span style="color:#999">Pham Dung</span></div></td>
+          <td class="sm mu">phamdung@co.com</td><td><span class="b b-m">End User</span></td><td><span class="b b-m">HCM</span></td><td><span class="b b-err">Inactive</span></td><td class="mu">30d ago</td>
+          <td><button class="btn-g">Edit</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec">Add / Edit User</div>
+  <div class="cd">
+    <div class="cd-b">
+      <div class="g2 mb">
+        <div class="fg"><label class="fl">Name</label><input class="fi" placeholder="Full name"></div>
+        <div class="fg"><label class="fl">Email</label><input class="fi" placeholder="email@company.com"></div>
+      </div>
+      <div class="g2 mb">
+        <div class="fg"><label class="fl">Role</label><select class="fi"><option>End User</option><option>DA</option><option>Admin</option></select></div>
+        <div class="fg"><label class="fl">Groups</label><select class="fi" multiple style="height:60px"><option>Phong Ke toan</option><option>Ban Giam doc</option><option>Chi nhanh HN</option></select></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-l">Cancel</button>
+        <button class="btn btn-d">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== 8. HISTORY ===== -->
+<div class="pg">
+<div class="nav">
+  <div style="display:flex;align-items:center">
+    <div class="logo">Data Portal</div>
+    <div class="links">
+      <a href="#">Dashboard</a>
+      <a href="#">Datasets</a>
+      <a href="#">Templates</a>
+      <a href="#">Export Configs</a>
+      <a href="#">Export</a>
+      <a href="#">Schedulers</a>
+      <a href="#">Users</a>
+      <a class="on" href="#">History</a>
+    </div>
+  </div>
+  <div class="right"><div class="av">AD</div></div>
+</div>
+<div class="wr">
+  <div class="bar">
+    <div class="bar-l">
+      <input class="fi" placeholder="Search..." style="width:160px">
+      <select class="fi" style="width:120px"><option>All Configs</option></select>
+      <select class="fi" style="width:100px"><option>All Status</option><option>Success</option><option>Failed</option></select>
+      <select class="fi" style="width:100px"><option>All Sources</option><option>Manual</option><option>Scheduler</option></select>
+    </div>
+  </div>
+  <div class="cd mb">
+    <table>
+      <thead><tr><th>ID</th><th>Config</th><th>Source</th><th>User</th><th>Status</th><th>File</th><th>Time</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="bold sm">#1247</td><td class="sm">Doanh thu PB</td><td><span class="b b-m">Manual</span></td><td class="sm">Nguyen A</td><td><span class="b b-ok">OK</span></td><td class="sm">1.2MB</td><td class="mu">27/01 14:30</td><td><button class="btn-g">DL</button> <button class="btn-g">Detail</button></td></tr>
+        <tr><td class="bold sm">#1246</td><td class="sm">KPI Tong hop</td><td><span class="b b-info">Sched</span></td><td class="sm">System</td><td><span class="b b-ok">OK</span></td><td class="sm">0.8MB</td><td class="mu">27/01 08:00</td><td><button class="btn-g">DL</button> <button class="btn-g">Detail</button></td></tr>
+        <tr style="background:#fef2f2"><td class="bold sm">#1243</td><td class="sm">NV Chi Nhanh</td><td><span class="b b-info">Sched</span></td><td class="sm">System</td><td><span class="b b-err">Fail</span></td><td class="sm">—</td><td class="mu">20/01 08:00</td><td><button class="btn-g">Retry</button> <button class="btn-g">Detail</button></td></tr>
+        <tr><td class="bold sm">#1242</td><td class="sm">Doanh thu PB</td><td><span class="b b-m">Manual</span></td><td class="sm">Le Huong</td><td><span class="b b-ok">OK</span></td><td class="sm">0.9MB</td><td class="mu">19/01 16:22</td><td><button class="btn-g">DL</button> <button class="btn-g">Detail</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec">Detail — #1247</div>
+  <div class="cd mb">
+    <div class="cd-b">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:10px"><span style="color:#16a34a;font-size:16px">&#10003;</span><span class="bold">Success</span></div>
+      <div class="g2 mb" style="font-size:13px">
+        <div><span class="mu">Config:</span> Doanh thu Phong Ban</div>
+        <div><span class="mu">Dataset:</span> Doanh thu PB</div>
+        <div><span class="mu">Template:</span> Bao cao v2.1</div>
+        <div><span class="mu">Duration:</span> 8.2s</div>
+        <div><span class="mu">User:</span> Nguyen Van A</div>
+        <div><span class="mu">Source:</span> Manual</div>
+      </div>
+      <div style="background:#f5f5f5;border-radius:5px;padding:8px 12px;margin-bottom:10px;font-size:13px">
+        <span class="mu">Filters:</span> Tu ngay: <b>01/01</b> · Den ngay: <b>31/01</b> · PB: <b>All</b>
+      </div>
+      <div style="background:#dcfce7;border-radius:5px;padding:8px 12px;margin-bottom:10px;font-size:13px">
+        <b>15,420</b> rows · <b>2</b> sheets · Doanh_thu_01-2024.xlsx · 1.2 MB
+      </div>
+      <button class="btn btn-d">Download</button> <button class="btn btn-l">Re-export</button>
+    </div>
+  </div>
+
+  <div class="sec">Detail — #1243 (Failed)</div>
+  <div class="cd">
+    <div class="cd-b">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:10px"><span style="color:#dc2626;font-size:16px">&#10005;</span><span class="bold" style="color:#dc2626">Failed</span><span class="b b-err" style="margin-left:4px">DATABASE_TIMEOUT</span></div>
+      <div style="background:#fee2e2;border-radius:5px;padding:8px 12px;margin-bottom:10px;font-size:13px">
+        <b>Error:</b> Connection to PostgreSQL timed out after 30s<br>
+        <span class="mu">Retries: 3/3 failed</span>
+      </div>
+      <div class="log mb">
+<div><span class="t">08:00:01</span> <span class="i">[INFO]</span> Starting export #1243</div>
+<div><span class="t">08:00:31</span> <span class="e">[ERROR]</span> Connection timeout (30s)</div>
+<div><span class="t">08:00:31</span> <span class="i">[INFO]</span> Retry 1/3...</div>
+<div><span class="t">08:01:01</span> <span class="e">[ERROR]</span> Connection timeout (30s)</div>
+<div><span class="t">08:01:31</span> <span class="e">[ERROR]</span> Export failed after 3 retries</div>
+      </div>
+      <button class="btn btn-d">Retry</button> <button class="btn btn-l">Copy Log</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const pp=document.querySelectorAll('.pg'),bb=document.querySelectorAll('.sw button');
+function go(i){pp.forEach(p=>p.classList.remove('on'));bb.forEach(b=>b.classList.remove('on'));pp[i].classList.add('on');bb[i].classList.add('on');scrollTo(0,0)}
+</script>
+</body>
+</html>
