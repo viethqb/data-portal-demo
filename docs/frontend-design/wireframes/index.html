@@ -305,45 +305,75 @@ select.fi{appearance:auto}
       </div>
       <div class="fg"><label class="fl">Description</label><input class="fi" value="Monthly revenue report by department"></div>
 
-      <div class="sec">Data Source</div>
-      <div class="g2 mb">
-        <div class="fg"><label class="fl">Dataset</label><select class="fi"><option>Doanh thu Phong Ban</option></select></div>
-        <div class="fg"><label class="fl">Template</label><select class="fi"><option>Bao cao Doanh thu v2.1</option></select></div>
+      <div class="sec">Template</div>
+      <div class="fg"><label class="fl">Template</label><select class="fi" style="width:50%"><option>Bao cao Doanh thu v2.1</option></select></div>
+
+      <div class="sec">Datasets & Mapping</div>
+
+      <!-- Dataset 1 -->
+      <div class="cd" style="border-color:#bbb;margin-bottom:10px">
+        <div class="cd-h"><span>Dataset 1</span><button class="btn-g" style="color:#dc2626">Remove</button></div>
+        <div class="cd-b">
+          <div class="fg"><label class="fl">Dataset</label><select class="fi"><option>Doanh thu Phong Ban</option></select></div>
+          <div class="g2 mb">
+            <div class="fg"><label class="fl">Target Sheet</label><select class="fi"><option>Sheet1</option></select></div>
+            <div class="fg"><label class="fl">Start Row</label><input class="fi" value="4" style="width:60px"></div>
+          </div>
+          <div class="fg"><label class="fl">Column Mapping</label>
+            <table>
+              <thead><tr><th>Column</th><th>Field</th><th>Format</th></tr></thead>
+              <tbody>
+                <tr><td><b>A</b></td><td>order_id</td><td>Number</td></tr>
+                <tr><td><b>B</b></td><td>customer_name</td><td>Text</td></tr>
+                <tr><td><b>C</b></td><td>amount</td><td>#,##0</td></tr>
+                <tr><td><b>D</b></td><td>order_date</td><td>DD/MM/YYYY</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="fg mt"><label class="fl">Cell Values</label>
+            <table>
+              <thead><tr><th>Cell</th><th>Value</th></tr></thead>
+              <tbody>
+                <tr><td><b>B2</b></td><td>{{start_date}}</td></tr>
+                <tr><td><b>D2</b></td><td>{{end_date}}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      <div class="sec">Data Mapping</div>
-      <div class="g2 mb">
-        <div class="fg"><label class="fl">Target Sheet</label><select class="fi"><option>Sheet1</option></select></div>
-        <div class="fg"><label class="fl">Start Row</label><input class="fi" value="4" style="width:60px"></div>
+      <!-- Dataset 2 -->
+      <div class="cd" style="border-color:#bbb;margin-bottom:10px">
+        <div class="cd-h"><span>Dataset 2</span><button class="btn-g" style="color:#dc2626">Remove</button></div>
+        <div class="cd-b">
+          <div class="fg"><label class="fl">Dataset</label><select class="fi"><option>NV Chi Nhanh</option></select></div>
+          <div class="g2 mb">
+            <div class="fg"><label class="fl">Target Sheet</label><select class="fi"><option>Summary</option></select></div>
+            <div class="fg"><label class="fl">Start Row</label><input class="fi" value="3" style="width:60px"></div>
+          </div>
+          <div class="fg"><label class="fl">Column Mapping</label>
+            <table>
+              <thead><tr><th>Column</th><th>Field</th><th>Format</th></tr></thead>
+              <tbody>
+                <tr><td><b>A</b></td><td>employee_id</td><td>Number</td></tr>
+                <tr><td><b>B</b></td><td>name</td><td>Text</td></tr>
+                <tr><td><b>C</b></td><td>branch</td><td>Text</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-      <div class="fg"><label class="fl">Column Mapping</label>
-        <table>
-          <thead><tr><th>Column</th><th>Field</th><th>Format</th></tr></thead>
-          <tbody>
-            <tr><td><b>A</b></td><td>order_id</td><td>Number</td></tr>
-            <tr><td><b>B</b></td><td>customer_name</td><td>Text</td></tr>
-            <tr><td><b>C</b></td><td>amount</td><td>#,##0</td></tr>
-            <tr><td><b>D</b></td><td>order_date</td><td>DD/MM/YYYY</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="fg mt"><label class="fl">Cell Values</label>
-        <table>
-          <thead><tr><th>Cell</th><th>Value</th></tr></thead>
-          <tbody>
-            <tr><td><b>B2</b></td><td>{{start_date}}</td></tr>
-            <tr><td><b>D2</b></td><td>{{end_date}}</td></tr>
-          </tbody>
-        </table>
-      </div>
+
+      <button class="btn btn-l mb">+ Add Dataset</button>
 
       <div class="sec">Filter Defaults</div>
       <table>
-        <thead><tr><th>Filter</th><th>Default Value</th><th>User Editable</th></tr></thead>
+        <thead><tr><th>Dataset</th><th>Filter</th><th>Default Value</th><th>User Editable</th></tr></thead>
         <tbody>
-          <tr><td>start_date</td><td>First day of month</td><td>Yes</td></tr>
-          <tr><td>end_date</td><td>Today</td><td>Yes</td></tr>
-          <tr><td>department</td><td>ALL</td><td>Yes</td></tr>
+          <tr><td class="mu">Doanh thu PB</td><td>start_date</td><td>First day of month</td><td>Yes</td></tr>
+          <tr><td class="mu">Doanh thu PB</td><td>end_date</td><td>Today</td><td>Yes</td></tr>
+          <tr><td class="mu">Doanh thu PB</td><td>department</td><td>ALL</td><td>Yes</td></tr>
+          <tr><td class="mu">NV Chi Nhanh</td><td>branch</td><td>ALL</td><td>Yes</td></tr>
         </tbody>
       </table>
 

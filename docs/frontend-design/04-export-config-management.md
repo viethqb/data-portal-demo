@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Allow DA to create export configurations: select a Dataset + Template, configure how data is written into Excel, set default filters, and assign access to End Users.
+Allow DA to create export configurations: select one or more Datasets + a Template, configure how each dataset's data is written into the template, set default filters, and assign access to End Users.
 
 ## Users
 
@@ -17,25 +17,28 @@ Allow DA to create export configurations: select a Dataset + Template, configure
 - Search bar + "+ New Export Config" button
 - Table:
 
-| Column      | Description          |
-| ----------- | -------------------- |
-| Name        | Config name          |
-| Dataset     | Source dataset       |
-| Template    | Template used        |
-| Status      | Active / Draft       |
-| Last Export | Last export time     |
-| Actions     | Edit, Delete         |
+| Column      | Description                    |
+| ----------- | ------------------------------ |
+| Name        | Config name                    |
+| Datasets    | Source datasets (comma-separated) |
+| Template    | Template used                  |
+| Status      | Active / Draft                 |
+| Last Export | Last export time               |
+| Actions     | Edit, Delete                   |
 
 ### Create/Edit Form (single page, scrollable sections)
 
 **Section 1 — Basic Info**
 - Name, Description, Status (Active/Draft)
 
-**Section 2 — Data Source**
-- Dataset (dropdown)
+**Section 2 — Template**
 - Template (dropdown)
 
-**Section 3 — Data Mapping**
+**Section 3 — Datasets & Mapping**
+
+A repeatable block — click "+ Add Dataset" to add more. Each block contains:
+
+- Dataset (dropdown)
 - Target Sheet (dropdown of sheets in template)
 - Start Row (row number where data writing begins)
 - Column Mapping table:
@@ -53,14 +56,19 @@ Allow DA to create export configurations: select a Dataset + Template, configure
 | B2   | {{start_date}} |
 | D2   | {{end_date}}   |
 
-**Section 4 — Filter Defaults**
-- Table of filters (from dataset), each row:
+- Remove button (to delete this dataset block)
 
-| Filter     | Default Value       | User Editable |
-| ---------- | ------------------- | ------------- |
-| start_date | First day of month  | Yes           |
-| end_date   | Today               | Yes           |
-| department | ALL                 | Yes           |
+Each dataset can write to a different sheet in the same template, or to different row ranges within the same sheet.
+
+**Section 4 — Filter Defaults**
+- Combined table of filters from all selected datasets, each row:
+
+| Dataset          | Filter     | Default Value       | User Editable |
+| ---------------- | ---------- | ------------------- | ------------- |
+| Doanh thu PB     | start_date | First day of month  | Yes           |
+| Doanh thu PB     | end_date   | Today               | Yes           |
+| Doanh thu PB     | department | ALL                 | Yes           |
+| NV Chi Nhanh     | branch     | ALL                 | Yes           |
 
 **Section 5 — Access Control**
 - Radio: "All End Users" or "Specific Users/Groups"
@@ -71,8 +79,8 @@ Allow DA to create export configurations: select a Dataset + Template, configure
 ## Flow
 
 1. DA clicks "+ New Export Config"
-2. Fills in name → selects Dataset + Template
-3. Configures column mapping (column → field)
-4. Sets filter defaults + marks which filters End Users can edit
+2. Fills in name → selects Template
+3. Adds one or more Datasets, each with its own sheet target + column mapping
+4. Sets filter defaults for all datasets + marks which filters End Users can edit
 5. Selects users/groups with access
 6. Preview → Save
