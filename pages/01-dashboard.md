@@ -21,9 +21,11 @@
 
 | Event | Action |
 |---|---|
-| On page load | Run queries: `countModules`, `countTemplates`, `recentExports`, `quickExportTemplates`, `getUserRole` |
+| On page load | Run queries: `countModules`, `countTemplates`, `countSchedulers`, `recentExports`, `quickExportTemplates`, `getUserRole` |
 
 ## Queries
+
+> **Shared queries used:** `getUserRole`, `downloadExecution` (and its sub-queries `getExecutionForDownload`, `readReportFile`). See [00-setup.md → Shared Queries & Helpers](../00-setup.md#shared-queries--helpers) — defined once at app level, called from this page.
 
 ### Q1: `countModules`
 
@@ -45,6 +47,18 @@
 | URL | `/api/v1/report-modules/client/templates` |
 | Body | `{"page": 1, "page_size": 1}` |
 | Run on page load | Yes |
+
+### Q2a: `countSchedulers`
+
+| Property | Value |
+|---|---|
+| Data source | ToolJet Database |
+| Table | `schedulers` |
+| Operation | List rows |
+| Filter | `is_active` equals `true` (only count active schedulers — change to none if you want total) |
+| Run on page load | Yes |
+
+Bind `statSchedulers` primary value to `{{queries.countSchedulers.data?.length || 0}}`. If the `schedulers` table grows large (> a few hundred rows), replace List rows with a raw SQL count query via a PostgreSQL data source pointed at the ToolJet DB.
 
 ### Q3a: `recentExportsAll` (for admin/da)
 
@@ -157,9 +171,10 @@ Use the **Statistics** component (built-in ToolJet component with primary/second
 | Property | Value |
 |---|---|
 | Component | **Statistics** |
-| Primary value label | `Schedulers` |
-| Primary value | `0` |
+| Primary value label | `Active Schedulers` |
+| Primary value | `{{queries.countSchedulers.data?.length \|\| 0}}` |
 | Hide secondary value | Yes |
+| Loading state | `{{queries.countSchedulers.isLoading}}` |
 
 ### C6: `sectionTitle` — Recent Exports Header
 

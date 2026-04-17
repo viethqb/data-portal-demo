@@ -338,12 +338,14 @@ Same Postman-style row editor pattern as the Test tab on page 04 — lets the sc
 
 **Row children (per row):**
 
+Each row carries `{id, key, type, value}`. Like page 04's Test tab, pass `{{self.value}}` into the helper to capture the component that fired the event.
+
 | # | Component | Properties |
 |---|---|---|
-| Text Input | Value: `{{listItem.key}}`, on blur → `sfUpdateParam` with `{id: listItem.id, field:'key', value}` |
-| Dropdown | Options: `[{label:'String',value:'string'},{label:'Number',value:'number'},{label:'Boolean',value:'boolean'},{label:'Date',value:'date'},{label:'JSON',value:'json'}]`, value: `{{listItem.type}}` |
-| Dynamic value input (switched by `listItem.type`) | See page 04 Test tab row children — same pattern |
-| Button | Label: `🗑`, variant: ghost → `sfDeleteParam` |
+| Text Input | Value: `{{listItem.key}}`, on blur → `sfUpdateParam` with `{id: listItem.id, field:'key', value: {{self.value}}}` |
+| Dropdown | Options: `[{label:'String',value:'string'},{label:'Number',value:'number'},{label:'Boolean',value:'boolean'},{label:'Date',value:'date'},{label:'JSON',value:'json'}]`, value: `{{listItem.type}}`, on change → `sfUpdateParam` with `{id: listItem.id, field:'type', value: {{self.value}}}` |
+| Dynamic value input (switched by `listItem.type`) — fires `sfUpdateParam` with `{id, field:'value', value: {{self.value}}}` on change | See page 04 Test tab row children — same 5 variants (Text / Number / Checkbox / Date / Code Editor) |
+| Button | Label: `🗑`, variant: ghost → `sfDeleteParam` with `{id: listItem.id}` |
 
 #### Helpers
 
@@ -369,7 +371,44 @@ const rows = Object.entries(obj).map(([k, v]) => {
 await actions.setVariable('schedulerParamRows', rows);
 ```
 
-**`sfUpdateParam`, `sfDeleteParam`, `btnAddSfParam`** — identical pattern to `tpUpdateParam` / `tpDeleteParam` / `btnAddTestParam` on page 04, but writing to `schedulerParamRows` instead.
+**`btnAddSfParam` on click:**
+
+```javascript
+const rows = [...(variables.schedulerParamRows || [])];
+rows.push({ id: Date.now() + '_' + Math.random(), key: '', type: 'string', value: '' });
+await actions.setVariable('schedulerParamRows', rows);
+```
+
+**`sfUpdateParam` (parameters: `id`, `field`, `value`):**
+
+```javascript
+const rows = (variables.schedulerParamRows || []).map(r =>
+  r.id === parameters.id ? { ...r, [parameters.field]: parameters.value } : r
+);
+await actions.setVariable('schedulerParamRows', rows);
+```
+
+**`sfDeleteParam` (parameter: `id`):**
+
+```javascript
+await actions.setVariable(
+  'schedulerParamRows',
+  (variables.schedulerParamRows || []).filter(r => r.id !== parameters.id)
+);
+```
+
+**`sfParamsMode` on change** — seed Raw JSON editor from rows when switching mode (same pattern as page 04 Test tab):
+
+```javascript
+if (components.sfParamsMode.value) {
+  const obj = {};
+  for (const row of (variables.schedulerParamRows || [])) {
+    if (!row.key) continue;
+    obj[row.key] = row.value;
+  }
+  await actions.setComponentValue('sfParamsRaw', JSON.stringify(obj, null, 2));
+}
+```
 
 **`sfInsertPlaceholder` on select** — appends the picked placeholder token to the **last focused** Text Input / Date value cell. Simpler alternative: copy the token to clipboard and show a toast "Placeholder copied — paste into a value field".
 

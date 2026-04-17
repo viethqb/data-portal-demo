@@ -33,6 +33,8 @@
 
 ## Queries
 
+> **Shared queries used:** `getUserRole`, `downloadExecution`. See [00-setup.md → Shared Queries & Helpers](../00-setup.md#shared-queries--helpers).
+
 ### Q1: `listAllTemplates`
 
 | Property | Value |

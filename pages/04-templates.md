@@ -52,6 +52,8 @@ Manages templates, sheet mappings, format config, and user permission assignment
 
 ## Part 1: List View Queries
 
+> **Shared queries used:** `downloadExecution` (Test tab download). See [00-setup.md → Shared Queries & Helpers](../00-setup.md#shared-queries--helpers).
+
 ### Q1: `listAllTemplates`
 
 | Property | Value |
@@ -99,6 +101,51 @@ return body;
 |---|---|
 | On success | Run `listAllTemplates` → Show alert "Template deleted" |
 
+### Q3a: `createTemplate`
+
+Creates a template inside the selected module. Matches backend schema `ReportTemplateCreate`. Minimum required fields in the UI: **module**, **name**, **output_bucket**. The rest (template file, output sheet, format, mappings, recalc) is set later from the detail view.
+
+| Property | Value |
+|---|---|
+| Data source | `pyDBAPI` (REST API) |
+| Method | POST |
+| URL | `/api/v1/report-modules/client/modules/{{components.ctModule.value}}/templates/create` |
+| Body | `{{queries.buildCreateTemplateBody.data}}` (see Q3b) |
+| Run on demand | Save button in create modal |
+
+| Event | Action |
+|---|---|
+| On success | 1. Close `createTemplateModal` |
+| | 2. Reset form (clear `ctName`, `ctDescription`, `ctOutputBucket`, `ctOutputPrefix`, `ctRecalc`) |
+| | 3. Run `buildListTemplatesBody` → `listAllTemplates` |
+| | 4. Show alert "Template created" |
+| | 5. (Optional) enter detail view of the new template: set `selectedTemplateId` = `{{queries.createTemplate.data.id}}`, `selectedModuleId` = `{{components.ctModule.value}}`, run `getTemplateDetail`, set `showDetail` = `true` |
+| On failure | Show alert: `{{queries.createTemplate.rawData?.detail || 'Create failed'}}` |
+
+### Q3b: `buildCreateTemplateBody` (JavaScript)
+
+Builds the request body as a real object. Keeps optional empty strings as empty (backend schema allows them), and sends `output_bucket` from either the explicit input or a fallback picked from the module's config if the admin left it blank.
+
+```javascript
+const modules = queries.listModulesForFilter.data || [];
+const selectedModule = modules.find(m => m.value === components.ctModule.value);
+// listModulesForFilter Transform only keeps {label, value}. If you need the
+// module's default output_bucket as a prefill, extend the Transform to include it.
+
+return {
+  name: components.ctName.value,
+  description: components.ctDescription.value || null,
+  template_bucket: components.ctTemplateBucket.value || '',
+  template_path: '',                                 // filled later from Files tab
+  output_bucket: components.ctOutputBucket.value,
+  output_prefix: components.ctOutputPrefix.value || '',
+  recalc_enabled: components.ctRecalc.value,
+  output_sheet: null,
+  format_config: null,
+  sheet_mappings: null,
+};
+```
+
 ## Part 1: List View Components
 
 ### C1: `searchInput`
@@ -136,6 +183,38 @@ return body;
 | Event | Action |
 |---|---|
 | On click | Show modal `createTemplateModal` |
+
+### C3a: `createTemplateModal`
+
+Minimal modal — only the fields required to create the row. Everything else (template file, output sheet, format, mappings) is configured in the detail view after create.
+
+| Property | Value |
+|---|---|
+| Component | Modal |
+| Title | `Create Template` |
+| Size | Medium |
+
+**Children:**
+
+| # | Component | ID | Type | Properties |
+|---|---|---|---|---|
+| 1 | Dropdown | `ctModule` | Dropdown | Label: `Module *`, options: `{{queries.listModulesForFilter.data}}`, searchInOptions: true, default: `''` |
+| 2 | Text Input | `ctName` | Text Input | Label: `Name *`, placeholder: `Monthly Sales Report`, default: `''` |
+| 3 | Textarea | `ctDescription` | Textarea | Label: `Description`, rows: 2, default: `''` |
+| 4 | Text Input | `ctTemplateBucket` | Text Input | Label: `Template Bucket`, placeholder: `report-templates (optional, inherits from module)`, default: `''` |
+| 5 | Text Input | `ctOutputBucket` | Text Input | Label: `Output Bucket *`, placeholder: `report-output`, default: `''` |
+| 6 | Text Input | `ctOutputPrefix` | Text Input | Label: `Output Prefix`, placeholder: `sales/monthly/`, default: `''` |
+| 7 | Checkbox | `ctRecalc` | Checkbox | Label: `Enable LibreOffice recalc`, default: `false` |
+| 8 | Text | `ctHint` | Text | Content: `Template file, output sheet, format and mappings can be configured after creation.`, font: 12px, muted |
+| 9 | Button | `btnSaveCreate` | Button | Label: `Create`, variant: primary, loading: `{{queries.createTemplate.isLoading}}`, disabled: `{{!components.ctModule.value || !components.ctName.value || !components.ctOutputBucket.value}}` |
+| 10 | Button | `btnCancelCreate` | Button | Label: `Cancel`, variant: outline |
+
+**`btnSaveCreate` event chain:**
+
+1. Run `buildCreateTemplateBody`
+2. Run `createTemplate`
+
+**`btnCancelCreate` event:** Close `createTemplateModal`
 
 ### C4: `templateTable`
 
@@ -628,7 +707,50 @@ URL.revokeObjectURL(url);
 |---|---|
 | On change | Set `mappingUseCustomFormat` = `{{components.mfUseCustomFormat.value}}`. If toggled off → set `mappingFormatConfig` = `{}`. |
 
-**Reused editor inside `mfFormatContainer`:** clone the General / Header Format / Data Format / Column Widths sections defined in Tab: Format. Bind each component to `variables.mappingFormatConfig` instead of `variables.formatConfig`, and call `fmtPatch` with `target: 'mappingFormatConfig'`. Use component-ID prefix `mmFmt*` (e.g., `mmFmtHeaderFontName`) to avoid collision with the template-level editor on the same page.
+#### Reused editor inside `mfFormatContainer`
+
+Structurally identical to Tab: Format — same 4 sections, same components, same `fmtPatch` helper. Only **three things differ** from the template-level editor:
+
+1. **Component ID prefix**: `mmFmt*` instead of `fmt*` — avoids collision because both editors live on the same page.
+2. **Bind path**: `variables.mappingFormatConfig.*` instead of `variables.formatConfig.*`.
+3. **Patch target**: every on-change handler passes `target: 'mappingFormatConfig'` to `fmtPatch`.
+
+**Component IDs (mirror of Tab: Format):**
+
+| Section | Template IDs (Tab: Format) | Mapping modal IDs |
+|---|---|---|
+| General | `fmtAutoFit`, `fmtAutoFitMax`, `fmtWrapTextGlobal` | `mmFmtAutoFit`, `mmFmtAutoFitMax`, `mmFmtWrapTextGlobal` |
+| Header | `fmtHeaderFontName`, `fmtHeaderFontSize`, `fmtHeaderBold`, `fmtHeaderItalic`, `fmtHeaderFontColorPreset`, `fmtHeaderFontColorHex`, `fmtHeaderBgPreset`, `fmtHeaderBgHex`, `fmtHeaderBorderStyle`, `fmtHeaderBorderColorPreset`, `fmtHeaderBorderColorHex`, `fmtHeaderHAlign`, `fmtHeaderVAlign`, `fmtHeaderWrapText`, `fmtHeaderNumFormatPreset`, `fmtHeaderNumFormatCustom` | Replace `fmtHeader` → `mmFmtHeader` |
+| Data | `fmtDataFontName` … `fmtDataNumFormatCustom` (16 components) | Replace `fmtData` → `mmFmtData` |
+| Column Widths | `fmtColWidthsList`, `fmtAddColWidth` | `mmFmtColWidthsList`, `mmFmtAddColWidth` |
+
+**Example bindings** — each on-change handler calls `fmtPatch` with `target` + `path`:
+
+| Component | Action |
+|---|---|
+| `mmFmtAutoFit` | Run `fmtPatch` with `target:'mappingFormatConfig', path:'auto_fit', value: components.mmFmtAutoFit.value` |
+| `mmFmtHeaderFontName` | Run `fmtPatch` with `target:'mappingFormatConfig', path:'header.font.name', value: components.mmFmtHeaderFontName.value` |
+| `mmFmtHeaderBgPreset` | Run `fmtPatch` with `target:'mappingFormatConfig', path:'header.fill.bg_color', value: ...` then sync `mmFmtHeaderBgHex` |
+| `mmFmtDataBold` | Run `fmtPatch` with `target:'mappingFormatConfig', path:'data.font.bold', value: components.mmFmtDataBold.value` |
+
+**Column widths helpers (mapping variant)** — the 3 JS helpers (`fmtAddColWidth`, `fmtUpdateColWidth`, `fmtDeleteColWidth`) are **specific to `variables.formatConfig`**. For the mapping editor you need 3 parallel helpers that write to `variables.mappingFormatConfig` instead:
+
+```javascript
+// mmFmtAddColWidth (on click)
+const current = {...(variables.mappingFormatConfig.column_widths || {})};
+const used = new Set(Object.keys(current));
+let next = 'NEW';
+for (let c = 65; c <= 90; c++) {
+  const letter = String.fromCharCode(c);
+  if (!used.has(letter)) { next = letter; break; }
+}
+current[next] = 15;
+await actions.setVariable('mappingFormatConfig', {...variables.mappingFormatConfig, column_widths: current});
+```
+
+`mmFmtUpdateColWidth` and `mmFmtDeleteColWidth` follow the same shape — copy `fmtUpdateColWidth` / `fmtDeleteColWidth` and replace `variables.formatConfig` with `variables.mappingFormatConfig`.
+
+> **Build tip:** in ToolJet, duplicate the `fmtContainer` Container (Cmd/Ctrl+D), rename the root ID to `mfFormatContainer`, then bulk-rename the child IDs via Find & Replace in the inspector. Each cloned child keeps its events — you only need to update the `target` parameter and component references.
 
 **`btnSaveMapping` event:**
 
@@ -718,9 +840,39 @@ On change for each → patch `variables.formatConfig` via small JS (see "Binding
 | 15 | Dropdown | `fmtHeaderNumFormatPreset` | Dropdown | Label: `Number format`, options: `{{queries.initFormatConstants.data.NUMBER_FORMATS}}`, value: `{{variables.formatConfig.header?.number_format || 'General'}}` |
 | 16 | Text Input | `fmtHeaderNumFormatCustom` | Text Input | Placeholder: `Custom e.g. #,##0.00_);[Red](#,##0.00)`, width: 300px |
 
-#### Data Format section
+#### Data Format section (inside collapsible container `fmtDataCollapse`)
 
-Identical structure to Header — use prefix `fmtData*` instead of `fmtHeader*`. Bind to `variables.formatConfig.data.*`.
+Mirrors the Header section component-for-component. Same options, same `fmtPatch` binding — only the IDs (`fmtData*`) and the bind path (`variables.formatConfig.data.*`) differ.
+
+| # | Component | ID | Type | Properties |
+|---|---|---|---|---|
+| 1 | Dropdown | `fmtDataFontName` | Dropdown | Label: `Font`, options: `{{queries.initFormatConstants.data.FONT_NAMES}}`, value: `{{variables.formatConfig.data?.font?.name || 'Calibri'}}` |
+| 2 | Dropdown | `fmtDataFontSize` | Dropdown | Label: `Size`, options: `{{queries.initFormatConstants.data.FONT_SIZES}}`, value: `{{variables.formatConfig.data?.font?.size || 11}}` |
+| 3 | Toggle | `fmtDataBold` | Toggle | Icon: `Bold`, value: `{{variables.formatConfig.data?.font?.bold ?? false}}` |
+| 4 | Toggle | `fmtDataItalic` | Toggle | Icon: `Italic`, value: `{{variables.formatConfig.data?.font?.italic ?? false}}` |
+| 5 | Dropdown | `fmtDataFontColorPreset` | Dropdown | Label: `Text color`, options: `{{queries.initFormatConstants.data.PRESET_COLORS}}`, value: `{{variables.formatConfig.data?.font?.color}}` |
+| 6 | Text Input | `fmtDataFontColorHex` | Text Input | Placeholder: `Hex`, max length: 6, width: 80px, value: `{{variables.formatConfig.data?.font?.color || ''}}` |
+| 7 | Dropdown | `fmtDataBgPreset` | Dropdown | Label: `Background`, options: `{{queries.initFormatConstants.data.PRESET_COLORS}}`, value: `{{variables.formatConfig.data?.fill?.bg_color}}` |
+| 8 | Text Input | `fmtDataBgHex` | Text Input | Placeholder: `Hex`, max length: 6, width: 80px |
+| 9 | Dropdown | `fmtDataBorderStyle` | Dropdown | Label: `Border`, options: `{{queries.initFormatConstants.data.BORDER_STYLES}}`, value: `{{variables.formatConfig.data?.border?.style || ''}}` |
+| 10 | Dropdown | `fmtDataBorderColorPreset` | Dropdown | Label: `Border color`, options: `{{queries.initFormatConstants.data.PRESET_COLORS}}`, value: `{{variables.formatConfig.data?.border?.color}}` |
+| 11 | Text Input | `fmtDataBorderColorHex` | Text Input | Placeholder: `Hex`, max length: 6, width: 80px |
+| 12 | Dropdown | `fmtDataHAlign` | Dropdown | Label: `H-Align`, options: `[{label:'Default',value:''},{label:'Left',value:'left'},{label:'Center',value:'center'},{label:'Right',value:'right'},{label:'Justify',value:'justify'}]`, value: `{{variables.formatConfig.data?.alignment?.horizontal || ''}}` |
+| 13 | Dropdown | `fmtDataVAlign` | Dropdown | Label: `V-Align`, options: `[{label:'Default',value:''},{label:'Top',value:'top'},{label:'Center',value:'center'},{label:'Bottom',value:'bottom'}]`, value: `{{variables.formatConfig.data?.alignment?.vertical || ''}}` |
+| 14 | Checkbox | `fmtDataWrapText` | Checkbox | Label: `Wrap text`, value: `{{variables.formatConfig.data?.alignment?.wrap_text ?? false}}` |
+| 15 | Dropdown | `fmtDataNumFormatPreset` | Dropdown | Label: `Number format`, options: `{{queries.initFormatConstants.data.NUMBER_FORMATS}}`, value: `{{variables.formatConfig.data?.number_format || 'General'}}` |
+| 16 | Text Input | `fmtDataNumFormatCustom` | Text Input | Placeholder: `Custom e.g. #,##0.00_);[Red](#,##0.00)`, width: 300px |
+
+Example bindings (on change) — same `fmtPatch` helper, just swap `header` → `data` in the path:
+
+| Component | Action |
+|---|---|
+| `fmtDataFontName` | Run `fmtPatch` with `path:'data.font.name', value: components.fmtDataFontName.value` |
+| `fmtDataBold` | Run `fmtPatch` with `path:'data.font.bold', value: components.fmtDataBold.value` |
+| `fmtDataBgPreset` | Run `fmtPatch` with `path:'data.fill.bg_color', value: components.fmtDataBgPreset.value` then sync `fmtDataBgHex` |
+| `fmtDataNumFormatPreset` | Run `fmtPatch` with `path:'data.number_format', value: components.fmtDataNumFormatPreset.value` |
+
+> **Tip:** since Header and Data sections are structurally identical, consider factoring the 16 components into a **ToolJet Container** and duplicate it (ToolJet lets you copy-paste a Container tree). Then rename IDs + bindings once per copy.
 
 #### Column Widths section (inside collapsible container `fmtColWidthsCollapse`)
 
@@ -1009,19 +1161,21 @@ Add to page variables:
 
 #### ListView row children (`testParamsList`)
 
-Each row carries `{id, key, type, value}`:
+Each row carries `{id, key, type, value}`. Pass the component's current value into the helper via `{{self.value}}` — inside a ListView row, `self` refers to the component that fired the event.
 
 | # | Component | Properties |
 |---|---|---|
-| Text Input | Label: `Key`, value: `{{listItem.key}}`, on blur → `tpUpdateParam` with `{id: listItem.id, field: 'key', value: text}` |
-| Dropdown | Label: `Type`, options: `[{label:'String',value:'string'},{label:'Number',value:'number'},{label:'Boolean',value:'boolean'},{label:'Date',value:'date'},{label:'JSON',value:'json'}]`, value: `{{listItem.type}}` |
-| Dynamic value input (one of the below, switched by `listItem.type`) | |
+| Text Input | Label: `Key`, value: `{{listItem.key}}`, on blur → `tpUpdateParam` with `{id: listItem.id, field: 'key', value: {{self.value}}}` |
+| Dropdown | Label: `Type`, options: `[{label:'String',value:'string'},{label:'Number',value:'number'},{label:'Boolean',value:'boolean'},{label:'Date',value:'date'},{label:'JSON',value:'json'}]`, value: `{{listItem.type}}`, on change → `tpUpdateParam` with `{id: listItem.id, field: 'type', value: {{self.value}}}` |
+| Dynamic value input (render one of the below, switched by `listItem.type`) — each on change fires `tpUpdateParam` with `{id: listItem.id, field: 'value', value: {{self.value}}}` | |
 | &nbsp;&nbsp;Text Input (type=string) | Value: `{{listItem.value}}` |
 | &nbsp;&nbsp;Number Input (type=number) | Value: `{{Number(listItem.value) || 0}}` |
 | &nbsp;&nbsp;Checkbox (type=boolean) | Value: `{{listItem.value === true || listItem.value === 'true'}}` |
 | &nbsp;&nbsp;Date Picker (type=date) | Value: `{{listItem.value}}`, format: `YYYY-MM-DD` |
 | &nbsp;&nbsp;Code Editor (type=json) | Mode: JSON, value: `{{typeof listItem.value === 'string' ? listItem.value : JSON.stringify(listItem.value)}}` |
 | Button | Label: `🗑`, variant: ghost → `tpDeleteParam` with `{id: listItem.id}` |
+
+> **ToolJet ListView caveat:** component IDs inside a ListView are shared across rows; only `listItem` and `{{self.value}}` are guaranteed to resolve per-row. If your ToolJet version doesn't expose `self`, fall back to editing a row via a modal — `tpEditRow` sets variable `editingParamRow = listItem`, opens `editParamModal`, and updates the row with standalone inputs.
 
 #### JS helpers
 
@@ -1111,33 +1265,36 @@ On failure of `tpBuildPayload` (Raw JSON parse error) → Show alert with the er
 List View:
 1. Page load → initFormatConstants + listModulesForFilter + (buildListTemplatesBody → listAllTemplates)
 2. Search/filter → buildListTemplatesBody → listAllTemplates
-3. Click [⚙] → getTemplateDetail → showDetail=true
+3. Click [+ Create Template] → createTemplateModal
+   → fill Module + Name + Output Bucket → btnSaveCreate
+   → buildCreateTemplateBody → createTemplate → refresh list
+4. Click [⚙] → getTemplateDetail → showDetail=true
 
 Detail View:
-4. Config tab: edit fields → btnSaveConfig → updateTemplate
-5. Files tab (MinIO Data Source):
+5. Config tab: edit fields → btnSaveConfig → updateTemplate
+6. Files tab (MinIO Data Source):
    a. listTemplateFiles on tab enter → fileTable shows files
    b. filePicker1 select → btnUpload → uploadTemplateFile → refresh list
    c. [Delete] → confirm → deleteTemplateFile → refresh list
    d. [Download] → readTemplateFile (MinIO) → JS blob → browser download
-6. Mappings tab:
+7. Mappings tab:
    a. [+ Add Mapping] → mappingFormModal open → reset mappingFormatConfig
       → fill form (incl. visual format editor if "Override" is on)
       → btnSaveMapping → buildMappingPayload → createMapping
    b. [Edit] on card → mappingFormModal (edit) → load mappingFormatConfig
       from row → buildMappingPayload → updateMapping
    c. [Delete] → deleteMapping
-7. Format tab:
+8. Format tab:
    a. On tab enter → init formatConfig from getTemplateDetail
    b. Each field change → fmtPatch → mutates variables.formatConfig
    c. btnSaveFormat → updateTemplate with body {id, format_config}
    d. btnClearFormat → confirm → reset formatConfig = {}
-8. Permissions tab:
+9. Permissions tab:
    a. listTemplatePermissions on tab enter
    b. [+ Add User] → addUserModal → addPermission
    c. [Remove] → removePermission
-9. Test tab:
-   a. Add parameter rows (key / type / value) OR toggle Raw JSON
-   b. btnTestGenerate → tpBuildPayload → testGenerate → poll → download
-10. [← Back] → showDetail=false
+10. Test tab:
+    a. Add parameter rows (key / type / value) OR toggle Raw JSON
+    b. btnTestGenerate → tpBuildPayload → testGenerate → poll → download
+11. [← Back] → showDetail=false
 ```

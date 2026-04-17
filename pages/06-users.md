@@ -64,59 +64,74 @@ Manage which end users can access which templates. Users are ToolJet workspace u
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+## Page Events
+
+| Event | Action |
+|---|---|
+| On page load | Run: `listToolJetUsers`, `listAllTemplates`, `listAllPermissions` → `buildUserList` |
+
 ## Queries
 
-### `listToolJetUsers`
+> **Note on raw SQL:** ToolJet Database's built-in operations (`List rows`, `Create row`, …) do NOT accept raw SQL. For the delete-by-filter patterns below, either use the `Delete row` operation with filters, or add a **PostgreSQL data source** pointed at the ToolJet DB (`tooljet_db`) so you can run real SQL. Code blocks below show both options.
 
-Get all ToolJet workspace users. Use ToolJet's built-in workspace users API or `tj_get_users` query:
+### Q1: `listToolJetUsers`
 
-```javascript
-// JavaScript query — fetch ToolJet users from workspace API
-const users = tooljet.users; // or use ToolJet's user management API
-return users.map(u => ({
-  email: u.email,
-  name: `${u.firstName || ''} ${u.lastName || ''}`.trim(),
-  group: (u.groups || []).map(g => g.name).join(', '),
-}));
-```
-
-### `listAllPermissions` (ToolJet Database)
-
-```sql
-SELECT tp.*, 
-  (SELECT COUNT(*) FROM template_permissions tp2 
-   WHERE tp2.user_email = tp.user_email) as template_count
-FROM template_permissions tp
-ORDER BY tp.user_email, tp.created_at
-```
-
-### `getUserPermissions` (ToolJet Database)
-
-```sql
-SELECT * FROM template_permissions
-WHERE user_email = '{{variables.selectedUserEmail}}'
-ORDER BY created_at
-```
-
-### `listAllTemplates` (pyDBAPI)
-
-```
-POST /api/v1/report-modules/client/templates
-Body: {"page": 1, "page_size": 100}
-```
-
-Used to populate the "Assign Template" dropdown.
-
-### `checkPermissionExists` (ToolJet Database)
+Get all ToolJet workspace users. The simplest approach uses ToolJet's internal admin API through a REST data source pointed at the ToolJet server.
 
 | Property | Value |
 |---|---|
+| Data source | REST API — `http://tooljet-server:3000` (internal) or ToolJet Admin API token |
+| Method | GET |
+| URL | `/api/organization_users` (ToolJet workspace users endpoint) |
+| Transform | `return data.organization_users.map(u => ({ email: u.email, name: \`${u.first_name || ''} ${u.last_name || ''}\`.trim(), group: (u.groups || []).map(g => g.name).join(',') }))` |
+
+> **Alt (simpler, no admin API):** if the list of end users is small and static, maintain it as a second ToolJet DB table `portal_users` and query it like any other row list. Trade-off: manual sync when new ToolJet users are added.
+
+### Q2: `listAllPermissions`
+
+| Property | Value |
+|---|---|
+| Data source | ToolJet Database |
 | Table | `template_permissions` |
-| Operation | List rows |
+| Operation | **List rows** |
+| Sort by | `user_email` ASC, then `created_at` ASC |
+
+Returns every permission row. Merging happens client-side in `buildUserList` — cheaper than the N+1 count subquery that raw SQL would require.
+
+### Q3: `getUserPermissions`
+
+| Property | Value |
+|---|---|
+| Data source | ToolJet Database |
+| Table | `template_permissions` |
+| Operation | **List rows** |
+| Filter | `user_email` equals `{{variables.selectedUserEmail}}` |
+| Sort by | `created_at` ASC |
+| Run on demand | When user row clicked |
+
+### Q4: `listAllTemplates`
+
+| Property | Value |
+|---|---|
+| Data source | `pyDBAPI` (REST API) |
+| Method | POST |
+| URL | `/api/v1/report-modules/client/templates` |
+| Body | `{"page": 1, "page_size": 100}` |
+| Run on page load | Yes |
+
+Used to populate the "Assign Template" dropdown and to resolve `template_id` → template name in the Assigned Templates table.
+
+### Q5: `checkPermissionExists`
+
+| Property | Value |
+|---|---|
+| Data source | ToolJet Database |
+| Table | `template_permissions` |
+| Operation | **List rows** |
 | Filter 1 | `user_email` equals `{{variables.selectedUserEmail}}` |
 | Filter 2 | `template_id` equals `{{parameters.templateId}}` |
 
-### `assignTemplate` (JavaScript)
+### Q6: `assignTemplate` (JavaScript)
 
 ```javascript
 // Check duplicate before insert
@@ -129,59 +144,83 @@ if (existing.data && existing.data.length > 0) {
 
 await queries.insertPermission.run({ templateId: parameters.templateId });
 await queries.getUserPermissions.run();
+await queries.listAllPermissions.run();        // refresh global counts
+await queries.buildUserList.run();
 return { skipped: false };
 ```
 
-### `insertPermission` (ToolJet Database)
+### Q7: `insertPermission`
 
 | Property | Value |
 |---|---|
+| Data source | ToolJet Database |
 | Table | `template_permissions` |
-| Operation | Create row |
+| Operation | **Create row** |
 | `user_email` | `{{variables.selectedUserEmail}}` |
 | `template_id` | `{{parameters.templateId}}` |
+| `created_at` | `{{new Date().toISOString()}}` |
 
-### `removePermission` (ToolJet Database)
+### Q8: `removePermission`
 
-```sql
-DELETE FROM template_permissions WHERE id = {{parameters.permissionId}}
-```
+| Property | Value |
+|---|---|
+| Data source | ToolJet Database |
+| Table | `template_permissions` |
+| Operation | **Delete row** |
+| Filter | `id` equals `{{parameters.permissionId}}` |
 
-### `assignAllTemplates` (JavaScript)
+| Event | Action |
+|---|---|
+| On success | Run `getUserPermissions` → `listAllPermissions` → `buildUserList` |
+
+### Q9: `assignAllTemplates` (JavaScript)
 
 ```javascript
 const templates = queries.listAllTemplates.data?.data || [];
-const email = variables.selectedUserEmail;
+const assigned = new Set((queries.getUserPermissions.data || []).map(p => p.template_id));
 
+let added = 0;
 for (const t of templates) {
-  await queries.assignTemplate.run({ templateId: t.id });
+  if (assigned.has(t.id)) continue;
+  await queries.insertPermission.run({ templateId: t.id });
+  added++;
 }
 
-await queries.getUserPermissions.run(); // refresh
+await queries.getUserPermissions.run();
+await queries.listAllPermissions.run();
+await queries.buildUserList.run();
+return { added };
 ```
 
-### `removeAllPermissions` (ToolJet Database)
+### Q10: `removeAllPermissions`
+
+Preferred: a JS query that lists → deletes each row via the `Delete row` operation. Avoids needing raw SQL.
+
+```javascript
+const rows = queries.getUserPermissions.data || [];
+for (const r of rows) {
+  await queries.removePermission.run({ permissionId: r.id });
+}
+await queries.getUserPermissions.run();
+await queries.listAllPermissions.run();
+await queries.buildUserList.run();
+```
+
+Alternative (if you have a PostgreSQL data source on `tooljet_db`):
 
 ```sql
 DELETE FROM template_permissions
 WHERE user_email = '{{variables.selectedUserEmail}}'
 ```
 
-## Components
+### Q11: `buildUserList` (JavaScript)
 
-### Users Table
-
-| Property | Value |
-|---|---|
-| Data | Merged: ToolJet users + permission counts |
-
-**Merge logic** (JavaScript query `buildUserList`):
+Merges ToolJet users with their permission counts. Runs once on page load and again whenever permissions change.
 
 ```javascript
 const users = queries.listToolJetUsers.data || [];
 const perms = queries.listAllPermissions.data || [];
 
-// Count permissions per user
 const permCounts = {};
 const permTemplates = {};
 for (const p of perms) {
@@ -190,45 +229,137 @@ for (const p of perms) {
   permTemplates[p.user_email].push(p.template_id);
 }
 
-return users.map(u => ({
-  ...u,
-  templateCount: permCounts[u.email] || 0,
-  isAdminOrDA: u.group.includes('admin') || u.group.includes('da'),
-}));
+// group is a comma-joined string like "admin,end_user" — split before comparing
+return users.map(u => {
+  const groups = (u.group || '').split(',').map(s => s.trim());
+  const isAdminOrDA = groups.includes('admin') || groups.includes('da');
+  return {
+    ...u,
+    templateCount: isAdminOrDA ? 'all' : (permCounts[u.email] || 0),
+    templateIds: permTemplates[u.email] || [],
+    isAdminOrDA,
+  };
+});
 ```
 
-| Column | Source | Format |
+## Components
+
+### C1: `headerText`
+
+| Property | Value |
+|---|---|
+| Component | Text |
+| Content | `Users & Permissions` |
+| Font size | 24px, bold |
+
+### C2: `searchUsers`
+
+| Property | Value |
+|---|---|
+| Component | Text Input |
+| Placeholder | `Search by email or name...` |
+| Width | 320px |
+
+Filter happens client-side in `userTable.Data`; no query needs to re-run.
+
+### C3: `userTable`
+
+| Property | Value |
+|---|---|
+| Component | Table |
+| Data | `{{(queries.buildUserList.data || []).filter(u => !components.searchUsers.value \|\| u.email.includes(components.searchUsers.value) \|\| (u.name \|\| '').toLowerCase().includes(components.searchUsers.value.toLowerCase()))}}` |
+| Loading | `{{queries.buildUserList.isLoading}}` |
+| Show pagination | Yes (client-side) |
+
+**Columns:**
+
+| # | Header | Key | Type | Width | Config |
+|---|---|---|---|---|---|
+| 1 | Email | `email` | Default | 240px | — |
+| 2 | Name | `name` | Default | 180px | — |
+| 3 | Group | `group` | **Badges** | 160px | One badge per group, split the comma-joined string |
+| 4 | Templates | `templateCount` | Default | 100px | Cell: `{{cellValue === 'all' ? 'all (role)' : cellValue}}` |
+| 5 | Actions | — | Action button | 120px | See below |
+
+**Action button: `Manage`:**
+
+| Event | Action |
+|---|---|
+| On click | 1. Set variable `selectedUserEmail` = `{{rowData.email}}` |
+| | 2. Run `getUserPermissions` |
+| | 3. Show modal `userPermissionsModal` |
+
+### C4: `userPermissionsModal`
+
+| Property | Value |
+|---|---|
+| Component | Modal |
+| Title | `Manage Permissions: {{variables.selectedUserEmail}}` |
+| Size | Large |
+
+**Children:**
+
+| # | Component | ID | Type | Properties |
+|---|---|---|---|---|
+| 1 | Text | `upmHeaderInfo` | Text | Content: `Group: {{(queries.buildUserList.data || []).find(u => u.email === variables.selectedUserEmail)?.group \|\| ''}}`, font: 13px, muted |
+| 2 | Text | `upmAdminHint` | Text | Content: `This user has the admin/DA role and automatically sees all templates. Assignments below are ignored for role-based access.`, color: amber, visible: `{{(queries.buildUserList.data || []).find(u => u.email === variables.selectedUserEmail)?.isAdminOrDA}}` |
+| 3 | Text | `upmAssignedTitle` | Text | Content: `Assigned Templates`, font: 16px, bold |
+| 4 | Table | `assignedTemplatesTable` | Table | Data: `{{queries.getUserPermissions.data}}`, see columns below |
+| 5 | Text | `upmAssignTitle` | Text | Content: `Assign a Template`, font: 16px, bold |
+| 6 | Dropdown | `upmTemplateToAssign` | Dropdown | Options: see below (already-assigned are disabled), searchInOptions: true |
+| 7 | Button | `btnAssignTemplate` | Button | Label: `Assign`, variant: primary, disabled: `{{!components.upmTemplateToAssign.value}}` |
+| 8 | Text | `upmQuickActionsTitle` | Text | Content: `Quick Actions`, font: 14px, bold |
+| 9 | Button | `btnAssignAll` | Button | Label: `Assign All Templates`, variant: outline |
+| 10 | Button | `btnRemoveAll` | Button | Label: `Remove All`, variant: destructive-outline |
+| 11 | Button | `btnCloseUserModal` | Button | Label: `Close`, variant: ghost |
+
+**`assignedTemplatesTable` columns:**
+
+| # | Header | Key | Width | Config |
+|---|---|---|---|---|
+| 1 | Template | `template_id` | 260px | Cell: `{{queries.listAllTemplates.data?.data?.find(t => t.id === cellValue)?.name \|\| cellValue}}` |
+| 2 | Module | `template_id` | 160px | Cell: `{{queries.listAllTemplates.data?.data?.find(t => t.id === cellValue)?.report_module_id \|\| '—'}}` |
+| 3 | Assigned | `created_at` | 140px | Cell: `{{new Date(cellValue).toLocaleDateString()}}` |
+| 4 | Actions | — | 100px | [Remove] button — Run `removePermission` with `permissionId: {{rowData.id}}` |
+
+**`upmTemplateToAssign` options:**
+
+```javascript
+{{
+  (queries.listAllTemplates.data?.data || []).map(t => {
+    const assignedIds = new Set((queries.getUserPermissions.data || []).map(p => p.template_id));
+    return {
+      label: assignedIds.has(t.id) ? (t.name + '  (already assigned)') : t.name,
+      value: t.id,
+      disable: assignedIds.has(t.id),
+    };
+  })
+}}
+```
+
+**Event bindings:**
+
+| Component | Event | Action |
 |---|---|---|
-| Email | `email` | Text |
-| Name | `name` | Text |
-| Group | `group` | Badge |
-| Templates | `templateCount` | Number, or "all" for admin/da |
-| Actions | — | [Manage] button |
+| `btnAssignTemplate` | On click | Run `assignTemplate` with `templateId: {{components.upmTemplateToAssign.value}}` → `setComponentValue(upmTemplateToAssign, '')` |
+| `btnAssignAll` | On click | Show confirm "Assign all templates to this user?" → Run `assignAllTemplates` |
+| `btnRemoveAll` | On click | Show confirm "Remove ALL template permissions from this user?" → Run `removeAllPermissions` |
+| `btnCloseUserModal` | On click | Close `userPermissionsModal` |
 
-**[Manage] button:**
-1. Set `selectedUserEmail = rowData.email`
-2. Run `getUserPermissions`
-3. Open `userPermissionsModal`
+## Event Flow
 
-### User Permissions Modal
-
-**Assigned Templates Table:**
-
-| Column | Source | Format |
-|---|---|---|
-| Template | `template_id` | Map to template name from `listAllTemplates` |
-| Module | — | Map template → module |
-| Actions | — | [Remove] button |
-
-**Assign Template Section:**
-
-- Dropdown listing all templates from `listAllTemplates`
-- Already-assigned templates shown as disabled
-- [Add] button → run `assignTemplate` → refresh
-
-**Quick Actions:**
-- [Assign All] → run `assignAllTemplates`
-- [Remove All] → run `removeAllPermissions` → refresh
+```text
+1. Page load → listToolJetUsers + listAllTemplates + listAllPermissions → buildUserList → userTable
+2. Type in searchUsers → userTable filters client-side
+3. Click [Manage] on a row:
+   a. selectedUserEmail = row.email → getUserPermissions → Show userPermissionsModal
+4. In modal:
+   a. Pick template → btnAssignTemplate → assignTemplate → refresh table + counts
+   b. [Remove] row → removePermission → refresh
+   c. [Assign All] → assignAllTemplates (skips already-assigned)
+   d. [Remove All] → removeAllPermissions (JS loop over rows, no raw SQL needed)
+5. [Close] → modal hides (selectedUserEmail persists; getUserPermissions cache stale until next Manage)
+```
 
 ## Variables
 

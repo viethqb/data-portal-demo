@@ -213,6 +213,19 @@ This data source is used for **template file management** — upload, list, dele
 └──────────────────────────────────────────────────────┘
 ```
 
+## Shared Queries & Helpers
+
+These queries are defined **once** at the app level and referenced from multiple pages. Add them to the app (Global Data Sources → pyDBAPI / MinIO / JavaScript) so every page can call them via `queries.<name>.run(...)`.
+
+| Name | Type | Used by | Purpose |
+|---|---|---|---|
+| `getExecutionForDownload` | pyDBAPI REST | Download flow | Fetch execution detail → get `output_minio_path` |
+| `readReportFile` | MinIO Read Object | Download flow | Read file content from MinIO output bucket |
+| `downloadExecution` | JavaScript | Dashboard, My Exports, History, Templates Test tab | Orchestrates get-detail → read-minio → blob download |
+| `getUserRole` | JavaScript | All pages | Resolve current user's role from groups |
+
+See full definitions in **Download Helper** and **Role Check Helper** below.
+
 ## Common Patterns
 
 ### pyDBAPI Queries
