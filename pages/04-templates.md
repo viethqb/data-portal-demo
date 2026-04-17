@@ -27,7 +27,7 @@ Manages templates, sheet mappings, format config, and user permission assignment
 
 | Event | Action |
 |---|---|
-| On page load | Run: `listAllTemplates`, `listModulesForFilter` |
+| On page load | Run: `initFormatConstants`, `listModulesForFilter`, `buildListTemplatesBody` → `listAllTemplates` |
 
 ## Variables
 
@@ -38,6 +38,11 @@ Manages templates, sheet mappings, format config, and user permission assignment
 | `selectedTemplateId` | String | `''` | Template being viewed/edited |
 | `isEditingMapping` | Boolean | `false` | Create vs edit mapping modal |
 | `editMappingData` | Object | `{}` | Pre-fill mapping form for edit |
+| `formatConfig` | Object | `{}` | Template-level format editor state (Tab: Format) |
+| `mappingFormatConfig` | Object | `{}` | Mapping-level format override state (mapping modal) |
+| `mappingUseCustomFormat` | Boolean | `false` | Whether mapping overrides template format |
+| `testParamRows` | Array | `[]` | Test tab dynamic parameter rows `{id, key, type, value}` |
+| `resolvedTestParams` | Object | `{}` | Built test payload, set by `tpBuildPayload` before `testGenerate` |
 | `testExportStatus` | String | `idle` | For test tab polling |
 | `testExecutionId` | String | `''` | For test download |
 | `testErrorMessage` | String | `''` | Test error display |
@@ -54,8 +59,21 @@ Manages templates, sheet mappings, format config, and user permission assignment
 | Data source | `pyDBAPI` (REST API) |
 | Method | POST |
 | URL | `/api/v1/report-modules/client/templates` |
-| Body | `{"page": 1, "page_size": 100, "name__ilike": {{components.searchInput.value ? `"${components.searchInput.value}"` : 'null'}}, "module_id": {{components.moduleFilter.value ? `"${components.moduleFilter.value}"` : 'null'}}}` |
-| Run on page load | Yes |
+| Body | `{{queries.buildListTemplatesBody.data}}` (see Q1a) |
+| Run on page load | Yes (after `buildListTemplatesBody` resolves) |
+
+### Q1a: `buildListTemplatesBody` (JavaScript)
+
+Builds the request body as a real object so user-typed quotes / special chars in the search input cannot break JSON. Triggered before `listAllTemplates` on every search/filter change.
+
+```javascript
+const body = { page: 1, page_size: 100 };
+const search = (components.searchInput?.value || '').trim();
+if (search) body.name__ilike = search;
+const moduleId = components.moduleFilter?.value || '';
+if (moduleId) body.module_id = moduleId;
+return body;
+```
 
 ### Q2: `listModulesForFilter`
 
@@ -93,7 +111,7 @@ Manages templates, sheet mappings, format config, and user permission assignment
 
 | Event | Action |
 |---|---|
-| On change (debounce 500ms) | Run `listAllTemplates` |
+| On change (debounce 500ms) | Run `buildListTemplatesBody` → Run `listAllTemplates` |
 
 ### C2: `moduleFilter`
 
@@ -105,7 +123,7 @@ Manages templates, sheet mappings, format config, and user permission assignment
 
 | Event | Action |
 |---|---|
-| On select | Run `listAllTemplates` |
+| On select | Run `buildListTemplatesBody` → Run `listAllTemplates` |
 
 ### C3: `btnCreateTemplate`
 
@@ -189,7 +207,7 @@ Manages templates, sheet mappings, format config, and user permission assignment
 | Data source | `pyDBAPI` (REST API) |
 | Method | POST |
 | URL | `/api/v1/report-modules/client/modules/{{variables.selectedModuleId}}/templates/{{variables.selectedTemplateId}}/mappings/create` |
-| Body | `{{JSON.stringify(components.mappingForm.formData)}}` |
+| Body | `{{queries.buildMappingPayload.data}}` (run `buildMappingPayload` first, see below) |
 | Run on demand | Save button in mapping modal |
 
 | Event | Action |
@@ -203,12 +221,37 @@ Manages templates, sheet mappings, format config, and user permission assignment
 | Data source | `pyDBAPI` (REST API) |
 | Method | POST |
 | URL | `/api/v1/report-modules/client/modules/{{variables.selectedModuleId}}/templates/{{variables.selectedTemplateId}}/mappings/update` |
-| Body | `{{JSON.stringify({id: variables.editMappingData.id, ...components.mappingForm.formData})}}` |
+| Body | `{{queries.buildMappingPayload.data}}` (adds `id` when `isEditingMapping`, see below) |
 | Run on demand | Save button in mapping modal (edit mode) |
 
 | Event | Action |
 |---|---|
 | On success | Close `mappingFormModal` → Run `getTemplateDetail` |
+
+### Q6a: `buildMappingPayload` (JavaScript)
+
+Single source of truth for both create and update bodies. Called from `btnSaveMapping` before running `createMapping` / `updateMapping`.
+
+```javascript
+const body = {
+  sheet_name: components.mfSheetName.value,
+  start_cell: components.mfStartCell.value,
+  write_mode: components.mfWriteMode.value,
+  sort_order: components.mfSortOrder.value,
+  gap_rows: components.mfGapRows.value,
+  write_headers: components.mfWriteHeaders.value,
+  sql_content: components.mfSqlContent.value,
+  format_config: variables.mappingUseCustomFormat ? variables.mappingFormatConfig : null,
+  description: components.mfDescription.value || null,
+};
+if (variables.isEditingMapping) body.id = variables.editMappingData.id;
+return body;
+```
+
+**`btnSaveMapping` event chain:**
+
+1. Run `buildMappingPayload`
+2. If `isEditingMapping` → run `updateMapping`, else → run `createMapping`
 
 ### Q8: `deleteMapping`
 
@@ -552,6 +595,13 @@ URL.revokeObjectURL(url);
 | Title | `{{variables.isEditingMapping ? 'Edit' : 'Add'}} Sheet Mapping` |
 | Size | Large |
 
+**Modal on open event:**
+
+| Event | Action |
+|---|---|
+| On show | 1. Set `mappingFormatConfig` = `{{variables.editMappingData.format_config || {}}}` |
+| | 2. Set `mappingUseCustomFormat` = `{{!!(variables.editMappingData.format_config && Object.keys(variables.editMappingData.format_config).length > 0)}}` |
+
 **Form `mappingForm` inside modal:**
 
 | # | Component | ID | Type | Default (create) | Default (edit) |
@@ -565,11 +615,20 @@ URL.revokeObjectURL(url);
 | 6 | Checkbox | `mfWriteHeaders` | Checkbox | `true` | `{{variables.editMappingData.write_headers}}` |
 | 7 | **Code Editor** | `mfSqlContent` | Code Editor | `SELECT 1` | `{{variables.editMappingData.sql_content}}` |
 | | | | | Mode: **SQL**, showLineNumber: Yes | |
-| 8 | **Code Editor** | `mfFormatConfig` | Code Editor | `{}` | `{{JSON.stringify(variables.editMappingData.format_config \|\| {}, null, 2)}}` |
-| | | | | Mode: **JSON**, showLineNumber: Yes | |
-| 9 | Text Input | `mfDescription` | Text Input | `''` | `{{variables.editMappingData.description}}` |
-| 10 | Button | `btnSaveMapping` | Button | Label: `Save`, variant: primary | |
-| 11 | Button | `btnCancelMapping` | Button | Label: `Cancel`, variant: outline | |
+| 8 | Toggle | `mfUseCustomFormat` | Toggle | Label: `Override template format`, value: `{{variables.mappingUseCustomFormat}}` | |
+| 9 | Container | `mfFormatContainer` | Container | Visible: `{{variables.mappingUseCustomFormat}}` — contains the same visual format editor as Tab: Format, but bound to `variables.mappingFormatConfig` and using prefix `mmFmt*` for component IDs | |
+| 10 | Text | `mfFormatDefaultNote` | Text | Content: `Using template default format_config. Turn on "Override template format" to customize.`, visible: `{{!variables.mappingUseCustomFormat}}`, muted | |
+| 11 | Text Input | `mfDescription` | Text Input | `''` | `{{variables.editMappingData.description}}` |
+| 12 | Button | `btnSaveMapping` | Button | Label: `Save`, variant: primary | |
+| 13 | Button | `btnCancelMapping` | Button | Label: `Cancel`, variant: outline | |
+
+**`mfUseCustomFormat` on change:**
+
+| Event | Action |
+|---|---|
+| On change | Set `mappingUseCustomFormat` = `{{components.mfUseCustomFormat.value}}`. If toggled off → set `mappingFormatConfig` = `{}`. |
+
+**Reused editor inside `mfFormatContainer`:** clone the General / Header Format / Data Format / Column Widths sections defined in Tab: Format. Bind each component to `variables.mappingFormatConfig` instead of `variables.formatConfig`, and call `fmtPatch` with `target: 'mappingFormatConfig'`. Use component-ID prefix `mmFmt*` (e.g., `mmFmtHeaderFontName`) to avoid collision with the template-level editor on the same page.
 
 **`btnSaveMapping` event:**
 
@@ -577,7 +636,7 @@ URL.revokeObjectURL(url);
 |---|---|
 | On click | If `isEditingMapping`: run `updateMapping`. Else: run `createMapping` |
 
-**Body assembled from form:**
+**Body assembled from form (no JSON.parse — `mappingFormatConfig` is already an object):**
 
 ```javascript
 {
@@ -588,7 +647,7 @@ URL.revokeObjectURL(url);
   "gap_rows": components.mfGapRows.value,
   "write_headers": components.mfWriteHeaders.value,
   "sql_content": components.mfSqlContent.value,
-  "format_config": JSON.parse(components.mfFormatConfig.value || '{}'),
+  "format_config": variables.mappingUseCustomFormat ? variables.mappingFormatConfig : null,
   "description": components.mfDescription.value || null
 }
 ```
@@ -597,39 +656,263 @@ URL.revokeObjectURL(url);
 
 ### Tab: Format
 
-Template-level default format config (inherited by all mappings).
+Template-level default format config (inherited by all mappings). Uses a **visual form editor** matching the pyDBAPI Dashboard (`FormatConfigEditor.tsx`) — no raw JSON. State is kept in `variables.formatConfig` (Object) and sent directly to the API.
+
+**Tab on enter event:**
+
+| Event | Action |
+|---|---|
+| On tab enter | Set variable `formatConfig` = `{{queries.getTemplateDetail.data.format_config || {}}}` |
+
+**Layout (inside a Container `fmtContainer`):**
+
+```text
+┌─ General ────────────────────────────────────────┐
+│ [x] Auto-fit columns     Max width: [ 50 ]      │
+│ [x] Wrap text (global)                           │
+├─ Header Format ──────────────────────────────────┤
+│ Font: [Calibri ▼]  Size: [11 ▼]  [B] [I]         │
+│ Text color:   [ Color ▼] [FFFFFF]                │
+│ Background:   [ Color ▼] [002060]                │
+│ Border:       [Thin ▼]   [ Color ▼] [000000]     │
+│ H-Align: [←][↔][→][⇔]  V-Align: [Top ▼] [x] Wrap │
+│ Number format: [General ▼]  or  [ custom...... ] │
+├─ Data Format ────────────────────────────────────┤
+│ (same structure as Header)                       │
+├─ Column Widths ──────────────────────────────────┤
+│ [A] [15.0] [🗑]                                   │
+│ [B] [25.0] [🗑]                                   │
+│ [+ Add column width]                             │
+└──────────────────────────────────────────────────┘
+[Clear All]               [Save Format]
+```
+
+#### General section
 
 | # | Component | ID | Type | Properties |
 |---|---|---|---|---|
-| 1 | **Code Editor** | `fmtEditor` | Code Editor | Mode: **JSON**, showLineNumber: Yes, default: `{{JSON.stringify(queries.getTemplateDetail.data.format_config \|\| {}, null, 2)}}` |
-| 2 | Text | `fmtReference` | Text | Static reference text (see below), font: 12px, muted |
-| 3 | Button | `btnSaveFormat` | Button | Label: `Save Format`, variant: primary |
+| 1 | Checkbox | `fmtAutoFit` | Checkbox | Label: `Auto-fit columns`, value: `{{variables.formatConfig.auto_fit ?? true}}` |
+| 2 | Number Input | `fmtAutoFitMax` | Number | Label: `Max width`, value: `{{variables.formatConfig.auto_fit_max_width ?? 50}}`, min: 1, step: 1, disabled: `{{!components.fmtAutoFit.value}}` |
+| 3 | Checkbox | `fmtWrapTextGlobal` | Checkbox | Label: `Wrap text (global)`, value: `{{variables.formatConfig.wrap_text ?? false}}` |
 
-**Reference text:**
+On change for each → patch `variables.formatConfig` via small JS (see "Binding helper" below).
 
-```text
-Format Config Reference:
-{
-  "auto_fit": true,               // Auto column widths
-  "auto_fit_max_width": 50,       // Max width cap
-  "wrap_text": true,              // Wrap text all cells
-  "header": {                     // Header row style
-    "font": {"name":"Calibri","size":11,"bold":true,"color":"FFFFFF"},
-    "fill": {"bg_color":"002060"},
-    "border": {"style":"thin","color":"000000"},
-    "alignment": {"horizontal":"center"},
-    "number_format": "#,##0"
-  },
-  "data": { ... },                // Data rows style (same structure)
-  "column_widths": {"A":15,"B":25}// Manual column widths
-}
+#### Header Format section (inside collapsible container `fmtHeaderCollapse`)
+
+| # | Component | ID | Type | Properties |
+|---|---|---|---|---|
+| 1 | Dropdown | `fmtHeaderFontName` | Dropdown | Label: `Font`, options: `{{queries.initFormatConstants.data.FONT_NAMES}}`, value: `{{variables.formatConfig.header?.font?.name || 'Calibri'}}` |
+| 2 | Dropdown | `fmtHeaderFontSize` | Dropdown | Label: `Size`, options: `{{queries.initFormatConstants.data.FONT_SIZES}}`, value: `{{variables.formatConfig.header?.font?.size || 11}}` |
+| 3 | Toggle | `fmtHeaderBold` | Toggle | Icon: `Bold`, value: `{{variables.formatConfig.header?.font?.bold ?? false}}` |
+| 4 | Toggle | `fmtHeaderItalic` | Toggle | Icon: `Italic`, value: `{{variables.formatConfig.header?.font?.italic ?? false}}` |
+| 5 | Dropdown | `fmtHeaderFontColorPreset` | Dropdown | Label: `Text color`, options: `{{queries.initFormatConstants.data.PRESET_COLORS}}`, value: `{{variables.formatConfig.header?.font?.color}}` |
+| 6 | Text Input | `fmtHeaderFontColorHex` | Text Input | Placeholder: `Hex`, max length: 6, width: 80px, value: `{{variables.formatConfig.header?.font?.color || ''}}` |
+| 7 | Dropdown | `fmtHeaderBgPreset` | Dropdown | Label: `Background`, options: `{{queries.initFormatConstants.data.PRESET_COLORS}}`, value: `{{variables.formatConfig.header?.fill?.bg_color}}` |
+| 8 | Text Input | `fmtHeaderBgHex` | Text Input | Placeholder: `Hex`, max length: 6, width: 80px |
+| 9 | Dropdown | `fmtHeaderBorderStyle` | Dropdown | Label: `Border`, options: `{{queries.initFormatConstants.data.BORDER_STYLES}}`, value: `{{variables.formatConfig.header?.border?.style || ''}}` |
+| 10 | Dropdown | `fmtHeaderBorderColorPreset` | Dropdown | Label: `Border color`, options: `{{queries.initFormatConstants.data.PRESET_COLORS}}`, value: `{{variables.formatConfig.header?.border?.color}}` |
+| 11 | Text Input | `fmtHeaderBorderColorHex` | Text Input | Placeholder: `Hex`, max length: 6, width: 80px |
+| 12 | Dropdown | `fmtHeaderHAlign` | Dropdown | Label: `H-Align`, options: `[{label:'Default',value:''},{label:'Left',value:'left'},{label:'Center',value:'center'},{label:'Right',value:'right'},{label:'Justify',value:'justify'}]`, value: `{{variables.formatConfig.header?.alignment?.horizontal || ''}}` |
+| 13 | Dropdown | `fmtHeaderVAlign` | Dropdown | Label: `V-Align`, options: `[{label:'Default',value:''},{label:'Top',value:'top'},{label:'Center',value:'center'},{label:'Bottom',value:'bottom'}]`, value: `{{variables.formatConfig.header?.alignment?.vertical || ''}}` |
+| 14 | Checkbox | `fmtHeaderWrapText` | Checkbox | Label: `Wrap text`, value: `{{variables.formatConfig.header?.alignment?.wrap_text ?? false}}` |
+| 15 | Dropdown | `fmtHeaderNumFormatPreset` | Dropdown | Label: `Number format`, options: `{{queries.initFormatConstants.data.NUMBER_FORMATS}}`, value: `{{variables.formatConfig.header?.number_format || 'General'}}` |
+| 16 | Text Input | `fmtHeaderNumFormatCustom` | Text Input | Placeholder: `Custom e.g. #,##0.00_);[Red](#,##0.00)`, width: 300px |
+
+#### Data Format section
+
+Identical structure to Header — use prefix `fmtData*` instead of `fmtHeader*`. Bind to `variables.formatConfig.data.*`.
+
+#### Column Widths section (inside collapsible container `fmtColWidthsCollapse`)
+
+Use a ListView bound to `variables.formatConfig.column_widths` converted to array:
+
+| # | Component | ID | Type | Properties |
+|---|---|---|---|---|
+| 1 | ListView | `fmtColWidthsList` | ListView | Data: `{{Object.entries(variables.formatConfig.column_widths || {}).map(([col, w]) => ({col, width: w}))}}`, row height: auto |
+| 2 | Button | `fmtAddColWidth` | Button | Label: `+ Add column width`, variant: outline |
+
+**Row children (per column width):**
+
+| # | Component | Properties |
+|---|---|---|
+| Text Input | Value: `{{listItem.col}}`, width: 60px, max length: 3, uppercase. On blur → JS `fmtUpdateColWidth` with `{oldKey: listItem.col, newKey: value, width: listItem.width}` |
+| Number Input | Value: `{{listItem.width}}`, width: 100px, step: 0.5. On change → JS `fmtUpdateColWidth` with `{oldKey: listItem.col, newKey: listItem.col, width: value}` |
+| Button | Label: `🗑`, variant: ghost. On click → JS `fmtDeleteColWidth` with `{key: listItem.col}` |
+
+#### Bottom buttons
+
+| # | Component | ID | Type | Properties |
+|---|---|---|---|---|
+| 1 | Button | `btnClearFormat` | Button | Label: `Clear All`, variant: outline |
+| 2 | Button | `btnSaveFormat` | Button | Label: `Save Format`, variant: primary |
+
+#### Constants (define once on page load)
+
+Create a JS query `initFormatConstants` run on page load:
+
+```javascript
+return {
+  FONT_NAMES: ['Arial','Calibri','Cambria','Consolas','Courier New','Georgia',
+               'Helvetica','Segoe UI','Tahoma','Times New Roman','Trebuchet MS','Verdana']
+    .map(n => ({label: n, value: n})),
+  FONT_SIZES: [8,9,10,11,12,14,16,18,20,24,28,36].map(s => ({label: String(s), value: s})),
+  PRESET_COLORS: [
+    {label:'None', value:''},
+    {label:'Black', value:'000000'}, {label:'White', value:'FFFFFF'},
+    {label:'Red', value:'FF0000'}, {label:'Dark Red', value:'C00000'},
+    {label:'Orange', value:'FF6600'}, {label:'Yellow', value:'FFFF00'},
+    {label:'Light Yellow', value:'FFFFCC'},
+    {label:'Green', value:'00B050'}, {label:'Dark Green', value:'006100'},
+    {label:'Light Green', value:'C6EFCE'},
+    {label:'Blue', value:'0070C0'}, {label:'Dark Blue', value:'002060'},
+    {label:'Light Blue', value:'DDEBF7'},
+    {label:'Purple', value:'7030A0'},
+    {label:'Gray 25%', value:'D9D9D9'}, {label:'Gray 50%', value:'808080'},
+    {label:'Gray 80%', value:'333333'},
+  ],
+  BORDER_STYLES: [
+    {label:'None', value:''}, {label:'Thin', value:'thin'},
+    {label:'Medium', value:'medium'}, {label:'Thick', value:'thick'},
+    {label:'Dashed', value:'dashed'}, {label:'Dotted', value:'dotted'},
+    {label:'Double', value:'double'},
+  ],
+  NUMBER_FORMATS: [
+    {label:'General', value:'General'},
+    {label:'#,##0', value:'#,##0'}, {label:'#,##0.00', value:'#,##0.00'},
+    {label:'0%', value:'0%'}, {label:'0.00%', value:'0.00%'},
+    {label:'yyyy-mm-dd', value:'yyyy-mm-dd'},
+    {label:'dd/mm/yyyy', value:'dd/mm/yyyy'},
+    {label:'yyyy-mm-dd hh:mm', value:'yyyy-mm-dd hh:mm:ss'},
+    {label:'@ (Text)', value:'@'},
+  ],
+};
 ```
+
+Reference these fields directly as `{{queries.initFormatConstants.data.FONT_NAMES}}` etc. — no need for separate page variables. Run this query once on page load; it has no side effects so it can stay cached for the session.
+
+#### Binding helper: `fmtPatch` (JavaScript query)
+
+Every on-change handler calls this with a dot-path and a value. Avoids writing 30+ inline handlers.
+
+```javascript
+// parameters: { target: 'formatConfig' | 'mappingFormatConfig', path: 'header.font.bold', value: true }
+const targetVar = parameters.target || 'formatConfig';
+const path = parameters.path;
+const value = parameters.value;
+
+const current = JSON.parse(JSON.stringify(
+  targetVar === 'mappingFormatConfig' ? variables.mappingFormatConfig : variables.formatConfig
+));
+
+const keys = path.split('.');
+let obj = current;
+for (let i = 0; i < keys.length - 1; i++) {
+  const k = keys[i];
+  if (obj[k] == null || typeof obj[k] !== 'object') obj[k] = {};
+  obj = obj[k];
+}
+const lastKey = keys[keys.length - 1];
+
+// Empty string / null / undefined → delete the key to keep config clean
+if (value === '' || value == null) {
+  delete obj[lastKey];
+} else {
+  obj[lastKey] = value;
+}
+
+// Prune empty nested objects ({}) recursively so the payload stays minimal
+const prune = (o) => {
+  Object.keys(o).forEach(k => {
+    if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) {
+      prune(o[k]);
+      if (Object.keys(o[k]).length === 0) delete o[k];
+    }
+  });
+};
+prune(current);
+
+await actions.setVariable(targetVar, current);
+```
+
+Example bindings (on change):
+
+| Component | Action |
+|---|---|
+| `fmtAutoFit` | Run `fmtPatch` with `target:'formatConfig', path:'auto_fit', value: components.fmtAutoFit.value` |
+| `fmtHeaderFontName` | Run `fmtPatch` with `path:'header.font.name', value: components.fmtHeaderFontName.value` |
+| `fmtHeaderBold` | Run `fmtPatch` with `path:'header.font.bold', value: components.fmtHeaderBold.value` |
+| `fmtHeaderBgPreset` | Run `fmtPatch` with `path:'header.fill.bg_color', value: components.fmtHeaderBgPreset.value` then also sync `fmtHeaderBgHex.value` |
+| `fmtHeaderBgHex` | Run `fmtPatch` with `path:'header.fill.bg_color', value: components.fmtHeaderBgHex.value.toUpperCase()` |
+| `fmtHeaderNumFormatPreset` | Run `fmtPatch` with `path:'header.number_format', value: components.fmtHeaderNumFormatPreset.value` |
+| `fmtHeaderNumFormatCustom` | Run `fmtPatch` with `path:'header.number_format', value: components.fmtHeaderNumFormatCustom.value` (only fires when non-empty) |
+
+Preset ↔ hex mirroring: when the preset dropdown changes, also `setComponentValue(fmtHeaderBgHex, value)` and vice-versa — a tiny JS wrapper can do both in one call.
+
+#### Column widths helpers
+
+**`fmtAddColWidth` on click** → JS:
+
+```javascript
+const current = {...(variables.formatConfig.column_widths || {})};
+// Pick next unused uppercase letter A-Z, fallback to 'NEW'
+const used = new Set(Object.keys(current));
+let next = 'NEW';
+for (let c = 65; c <= 90; c++) {
+  const letter = String.fromCharCode(c);
+  if (!used.has(letter)) { next = letter; break; }
+}
+current[next] = 15;
+await actions.setVariable('formatConfig', {...variables.formatConfig, column_widths: current});
+```
+
+**`fmtUpdateColWidth` (JS query, parameters: `oldKey`, `newKey`, `width`)**:
+
+```javascript
+const current = {...(variables.formatConfig.column_widths || {})};
+const key = (parameters.newKey || '').toUpperCase().trim();
+if (!key) return;
+if (parameters.oldKey !== key) delete current[parameters.oldKey];
+current[key] = Number(parameters.width) || 0;
+await actions.setVariable('formatConfig', {...variables.formatConfig, column_widths: current});
+```
+
+**`fmtDeleteColWidth` (JS query, parameter: `key`)**:
+
+```javascript
+const current = {...(variables.formatConfig.column_widths || {})};
+delete current[parameters.key];
+await actions.setVariable('formatConfig', {...variables.formatConfig, column_widths: current});
+```
+
+#### Save & Clear
 
 **`btnSaveFormat` event:**
 
 | Event | Action |
 |---|---|
-| On click | Run `updateTemplate` with body: `{"id": "{{selectedTemplateId}}", "format_config": {{components.fmtEditor.value}}}` |
+| On click | Run `updateTemplate` with body: `{{ {id: variables.selectedTemplateId, format_config: variables.formatConfig} }}` |
+
+No `JSON.parse` / `JSON.stringify` — the variable already holds the object. ToolJet serializes it as JSON when sending.
+
+**`btnClearFormat` event:**
+
+| Event | Action |
+|---|---|
+| On click | Show confirm dialog → Set variable `formatConfig` = `{}` → Reset all form component values |
+
+---
+
+#### Alternative: embed the pyDBAPI editor as a Custom Component
+
+If maintaining 30+ ToolJet components is heavy, wrap `FormatConfigEditor.tsx` (from pyDBAPI) as a ToolJet **Custom Component**:
+
+1. Package `FormatConfigEditor` + its `Button`, `Input`, `Select`, `Toggle` dependencies as a single bundle.
+2. Expose `value` and `onChange` as ToolJet Custom Component props.
+3. In this tab, replace the whole form with a single `<CustomComponent id="fmtEditor" />`:
+   - `exposedVariables`: `{ value: variables.formatConfig }`
+   - On event `onChange` → Run `fmtPatch` with the full new object (or simpler: `setVariable('formatConfig', payload)`).
+
+Trade-off: avoids duplicating 30 components but introduces a React bundle dependency. Pick native ToolJet components if the team is not comfortable bundling React code.
 
 ---
 
@@ -678,21 +961,145 @@ Format Config Reference:
 
 ### Tab: Test
 
+Replaces the old JSON Code Editor with a **dynamic key-value form** (Postman-style). Each row is a parameter with a **type selector** so values are serialized correctly (string / number / boolean / date / JSON). Keeps a fallback "Raw JSON" toggle for advanced nested payloads.
+
+**Tab on enter event:**
+
+| Event | Action |
+|---|---|
+| On tab enter | If `variables.testParamRows` is empty: set `testParamRows = []`, set `testExportStatus = 'idle'`, clear `testExecutionId` / `testErrorMessage` |
+
+#### Layout
+
+```text
+┌─ Parameters ────────────────────────────────────────────────┐
+│ [x] Simple mode   ( )Raw JSON                                │
+├─ Simple mode (default) ─────────────────────────────────────┤
+│  Key            Type       Value                             │
+│  [start_date ] [Date ▼  ] [2026-04-01      ] [🗑]            │
+│  [region     ] [String▼ ] [north           ] [🗑]            │
+│  [limit      ] [Number▼ ] [1000            ] [🗑]            │
+│  [+ Add parameter]                                           │
+├─ Raw JSON mode ─────────────────────────────────────────────┤
+│  { "start_date": "2026-04-01", ... }                         │
+└─────────────────────────────────────────────────────────────┘
+[Generate Test Report]
+```
+
+#### Components
+
 | # | Component | ID | Type | Properties |
 |---|---|---|---|---|
-| 1 | **Code Editor** | `testParams` | Code Editor | Mode: **JSON**, showLineNumber: Yes, default: `{}` |
-| 2 | Button | `btnTestGenerate` | Button | Label: `Generate Test Report`, variant: primary, loading: `{{queries.testGenerate.isLoading}}` |
-| 3 | Spinner | `testSpinner` | Spinner | Visible: `{{variables.testExportStatus === 'running'}}` |
-| 4 | Text | `testResult` | Text | Visible: `{{variables.testExportStatus !== 'idle'}}` |
-| 5 | Button | `btnTestDownload` | Button | Label: `Download`, visible: `{{variables.testExportStatus === 'success'}}` |
+| 1 | Toggle | `testParamsMode` | Toggle | Label: `Raw JSON`, value: false (default simple mode) |
+| 2 | ListView | `testParamsList` | ListView | Data: `{{variables.testParamRows}}`, visible: `{{!components.testParamsMode.value}}` |
+| 3 | Button | `btnAddTestParam` | Button | Label: `+ Add parameter`, variant: outline, visible: `{{!components.testParamsMode.value}}` |
+| 4 | Code Editor | `testParamsRaw` | Code Editor | Mode: JSON, showLineNumber: Yes, visible: `{{components.testParamsMode.value}}` |
+| 5 | Button | `btnTestGenerate` | Button | Label: `Generate Test Report`, variant: primary, loading: `{{queries.testGenerate.isLoading}}` |
+| 6 | Spinner | `testSpinner` | Spinner | Visible: `{{variables.testExportStatus === 'running'}}` |
+| 7 | Text | `testResult` | Text | Visible: `{{variables.testExportStatus !== 'idle'}}` |
+| 8 | Button | `btnTestDownload` | Button | Label: `Download`, visible: `{{variables.testExportStatus === 'success'}}` |
 
-**`btnTestGenerate` body:**
+#### Variable
 
-```json
-{
-  "parameters": {{components.testParams.value || '{}'}}
-}
+Add to page variables:
+
+| Variable | Type | Default | Purpose |
+|---|---|---|---|
+| `testParamRows` | Array | `[]` | Rows of `{id, key, type, value}` for the simple editor |
+
+#### ListView row children (`testParamsList`)
+
+Each row carries `{id, key, type, value}`:
+
+| # | Component | Properties |
+|---|---|---|
+| Text Input | Label: `Key`, value: `{{listItem.key}}`, on blur → `tpUpdateParam` with `{id: listItem.id, field: 'key', value: text}` |
+| Dropdown | Label: `Type`, options: `[{label:'String',value:'string'},{label:'Number',value:'number'},{label:'Boolean',value:'boolean'},{label:'Date',value:'date'},{label:'JSON',value:'json'}]`, value: `{{listItem.type}}` |
+| Dynamic value input (one of the below, switched by `listItem.type`) | |
+| &nbsp;&nbsp;Text Input (type=string) | Value: `{{listItem.value}}` |
+| &nbsp;&nbsp;Number Input (type=number) | Value: `{{Number(listItem.value) || 0}}` |
+| &nbsp;&nbsp;Checkbox (type=boolean) | Value: `{{listItem.value === true || listItem.value === 'true'}}` |
+| &nbsp;&nbsp;Date Picker (type=date) | Value: `{{listItem.value}}`, format: `YYYY-MM-DD` |
+| &nbsp;&nbsp;Code Editor (type=json) | Mode: JSON, value: `{{typeof listItem.value === 'string' ? listItem.value : JSON.stringify(listItem.value)}}` |
+| Button | Label: `🗑`, variant: ghost → `tpDeleteParam` with `{id: listItem.id}` |
+
+#### JS helpers
+
+**`btnAddTestParam` on click:**
+
+```javascript
+const rows = [...(variables.testParamRows || [])];
+rows.push({ id: Date.now() + '_' + Math.random(), key: '', type: 'string', value: '' });
+await actions.setVariable('testParamRows', rows);
 ```
+
+**`tpUpdateParam` (parameters: `id`, `field`, `value`):**
+
+```javascript
+const rows = (variables.testParamRows || []).map(r =>
+  r.id === parameters.id ? { ...r, [parameters.field]: parameters.value } : r
+);
+await actions.setVariable('testParamRows', rows);
+```
+
+**`tpDeleteParam` (parameter: `id`):**
+
+```javascript
+await actions.setVariable(
+  'testParamRows',
+  (variables.testParamRows || []).filter(r => r.id !== parameters.id)
+);
+```
+
+**`testParamsMode` on change** — seed the raw editor from rows when switching to Raw JSON so the user doesn't lose what they typed:
+
+```javascript
+if (components.testParamsMode.value) {
+  // Simple → Raw: dump rows into editor
+  const obj = {};
+  for (const row of (variables.testParamRows || [])) {
+    if (!row.key) continue;
+    obj[row.key] = row.value;
+  }
+  await actions.setComponentValue('testParamsRaw', JSON.stringify(obj, null, 2));
+}
+// Raw → Simple: rows are preserved; user can keep editing.
+```
+
+**`tpBuildPayload` (called before `btnTestGenerate`):**
+
+```javascript
+// If Raw JSON mode, parse the code editor. Else, build from rows.
+if (components.testParamsMode.value) {
+  try {
+    return JSON.parse(components.testParamsRaw.value || '{}');
+  } catch (e) {
+    throw new Error('Invalid JSON: ' + e.message);
+  }
+}
+
+const out = {};
+for (const row of (variables.testParamRows || [])) {
+  if (!row.key) continue;
+  let v = row.value;
+  switch (row.type) {
+    case 'number':  v = Number(v); break;
+    case 'boolean': v = v === true || v === 'true'; break;
+    case 'date':    v = String(v || ''); break;
+    case 'json':    v = typeof v === 'string' ? JSON.parse(v || 'null') : v; break;
+    default:        v = String(v ?? '');
+  }
+  out[row.key] = v;
+}
+return out;
+```
+
+**`btnTestGenerate` event chain:**
+
+1. Run `tpBuildPayload` → `variables.resolvedTestParams = queries.tpBuildPayload.data`
+2. Run `testGenerate` with body: `{{ {parameters: variables.resolvedTestParams} }}`
+
+On failure of `tpBuildPayload` (Raw JSON parse error) → Show alert with the error message.
 
 **`btnTestDownload` event:** Run `downloadExecution` with `executionId: {{variables.testExecutionId}}`
 
@@ -702,8 +1109,8 @@ Format Config Reference:
 
 ```text
 List View:
-1. Page load → listAllTemplates + listModulesForFilter
-2. Search/filter → re-run listAllTemplates
+1. Page load → initFormatConstants + listModulesForFilter + (buildListTemplatesBody → listAllTemplates)
+2. Search/filter → buildListTemplatesBody → listAllTemplates
 3. Click [⚙] → getTemplateDetail → showDetail=true
 
 Detail View:
@@ -714,14 +1121,23 @@ Detail View:
    c. [Delete] → confirm → deleteTemplateFile → refresh list
    d. [Download] → readTemplateFile (MinIO) → JS blob → browser download
 6. Mappings tab:
-   a. [+ Add Mapping] → mappingFormModal (create) → createMapping
-   b. [Edit] on card → mappingFormModal (edit) → updateMapping
+   a. [+ Add Mapping] → mappingFormModal open → reset mappingFormatConfig
+      → fill form (incl. visual format editor if "Override" is on)
+      → btnSaveMapping → buildMappingPayload → createMapping
+   b. [Edit] on card → mappingFormModal (edit) → load mappingFormatConfig
+      from row → buildMappingPayload → updateMapping
    c. [Delete] → deleteMapping
-7. Format tab: edit JSON → btnSaveFormat → updateTemplate
+7. Format tab:
+   a. On tab enter → init formatConfig from getTemplateDetail
+   b. Each field change → fmtPatch → mutates variables.formatConfig
+   c. btnSaveFormat → updateTemplate with body {id, format_config}
+   d. btnClearFormat → confirm → reset formatConfig = {}
 8. Permissions tab:
    a. listTemplatePermissions on tab enter
    b. [+ Add User] → addUserModal → addPermission
    c. [Remove] → removePermission
-9. Test tab: enter params → testGenerate → poll → download
+9. Test tab:
+   a. Add parameter rows (key / type / value) OR toggle Raw JSON
+   b. btnTestGenerate → tpBuildPayload → testGenerate → poll → download
 10. [← Back] → showDetail=false
 ```

@@ -81,6 +81,8 @@ Create in **ToolJet Database**:
 | `isEditing` | Boolean | `false` | Create vs edit mode |
 | `editSchedulerData` | Object | `{}` | Pre-fill form for edit |
 | `schedulerToDelete` | Number | `null` | ID for delete confirm |
+| `schedulerParamRows` | Array | `[]` | Rows of `{id, key, type, value}` for dynamic parameter form |
+| `cronNextRuns` | Array | `[]` | Preview of next run times |
 
 ## Queries
 
@@ -120,7 +122,7 @@ Create in **ToolJet Database**:
 | `template_id` | `{{components.sfTemplate.value}}` |
 | `template_name` | `{{components.sfTemplate.selectedOption.label}}` |
 | `module_id` | `{{queries.listAllTemplates.data.find(t => t.value === components.sfTemplate.value)?.module_id}}` |
-| `parameters` | `{{components.sfParameters.value}}` |
+| `parameters` | `{{queries.sfBuildParametersJSON.data}}` (JSON string with placeholders, see Dynamic Parameter Form below) |
 | `cron_expression` | `{{components.sfCron.value}}` |
 | `timezone` | `{{components.sfTimezone.value}}` |
 | `recipients` | `{{components.sfRecipients.value}}` |
@@ -278,6 +280,12 @@ Same columns as Q3, plus `updated_at` = `{{new Date().toISOString()}}`.
 | Title | `{{variables.isEditing ? 'Edit' : 'Create'}} Scheduler` |
 | Size | Large |
 
+**Modal on open event:**
+
+| Event | Action |
+|---|---|
+| On show | Parse existing parameters into rows: run `sfLoadParamsForEdit` (see below) |
+
 **Children:**
 
 | # | Component | ID | Type | Properties |
@@ -285,16 +293,199 @@ Same columns as Q3, plus `updated_at` = `{{new Date().toISOString()}}`.
 | 1 | Text Input | `sfName` | Text Input | Label: `Name *`, default: `{{variables.editSchedulerData.name \|\| ''}}` |
 | 2 | Textarea | `sfDescription` | Textarea | Label: `Description`, rows: 2, default: `{{variables.editSchedulerData.description \|\| ''}}` |
 | 3 | Dropdown | `sfTemplate` | Dropdown | Label: `Template *`, options: `{{queries.listAllTemplates.data}}`, default: `{{variables.editSchedulerData.template_id}}`, searchInOptions: true |
-| 4 | Code Editor | `sfParameters` | Code Editor | Label: `Parameters (JSON with placeholders)`, mode: JSON, default: `{{variables.editSchedulerData.parameters \|\| '{}'}}` |
-| 5 | Text | `sfPlaceholderRef` | Text | Content: see Date Placeholders reference below, font: 11px, muted |
-| 6 | Text Input | `sfCron` | Text Input | Label: `Cron Expression *`, placeholder: `0 9 * * 1`, default: `{{variables.editSchedulerData.cron_expression \|\| ''}}` |
-| 7 | Text | `sfCronHelp` | Text | Content: `Examples: 0 9 * * 1 (Mon 9am), 0 8 1 * * (1st 8am), 0 7 * * * (daily 7am)`, font: 11px, muted |
+| 4 | **(See: Dynamic Parameter Form)** | — | — | Replaces the old Code Editor |
+| 5 | Dropdown | `sfCronPreset` | Dropdown | Label: `Schedule preset`, options: see Cron Preset Dropdown below, value: `''` |
+| 6 | Text Input | `sfCron` | Text Input | Label: `Cron Expression *`, placeholder: `0 9 * * 1`, default: `{{variables.editSchedulerData.cron_expression \|\| ''}}`, font: mono |
+| 7 | Text | `sfCronNextRuns` | Text | Content: `{{variables.cronNextRuns.length > 0 ? 'Next runs: ' + variables.cronNextRuns.join(', ') : 'Enter a cron expression or pick a preset to see next run times'}}`, font: 11px, muted |
 | 8 | Dropdown | `sfTimezone` | Dropdown | Label: `Timezone`, options: timezone list, default: `{{variables.editSchedulerData.timezone \|\| 'Asia/Ho_Chi_Minh'}}`, searchInOptions: true |
 | 9 | Text Input | `sfRecipients` | Text Input | Label: `Recipients (comma-separated emails)`, placeholder: `user1@co.com, user2@co.com`, default: `{{variables.editSchedulerData.recipients \|\| ''}}` |
 | 10 | Text Input | `sfEmailSubject` | Text Input | Label: `Email Subject`, placeholder: `Weekly Report - {{YYYY-MM-DD}}`, default: `{{variables.editSchedulerData.email_subject \|\| ''}}` |
 | 11 | Textarea | `sfEmailBody` | Textarea | Label: `Email Body`, rows: 4, default: `{{variables.editSchedulerData.email_body \|\| ''}}` |
 | 12 | Button | `btnSaveScheduler` | Button | Label: `Save`, variant: primary |
 | 13 | Button | `btnCancelScheduler` | Button | Label: `Cancel`, variant: outline |
+
+---
+
+### Dynamic Parameter Form (replaces `sfParameters` Code Editor)
+
+Same Postman-style row editor pattern as the Test tab on page 04 — lets the scheduler builder add parameters one row at a time with a type picker, while still supporting date placeholders like `{{TODAY}}` / `{{FIRST_DAY_OF_MONTH}}` in String / Date values.
+
+#### Layout
+
+```text
+┌─ Parameters ────────────────────────────────────────────────┐
+│ [x] Simple form    ( ) Raw JSON                              │
+├─ Simple form (default) ─────────────────────────────────────┤
+│  Key            Type     Value                               │
+│  [date_from]   [Date ▼] [{{FIRST_DAY_OF_MONTH}}] [📅] [🗑]  │
+│  [region   ]   [String▼] [north                 ]       [🗑]│
+│  [limit    ]   [Number▼] [1000                  ]       [🗑]│
+│  [+ Add parameter]    [Insert placeholder ▼]                 │
+├─ Raw JSON mode ─────────────────────────────────────────────┤
+│  { "date_from": "{{FIRST_DAY_OF_MONTH}}", ... }              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Components (inside the modal)
+
+| # | Component | ID | Type | Properties |
+|---|---|---|---|---|
+| 1 | Toggle | `sfParamsMode` | Toggle | Label: `Raw JSON`, value: false |
+| 2 | ListView | `sfParamsList` | ListView | Data: `{{variables.schedulerParamRows}}`, visible: `{{!components.sfParamsMode.value}}`, row height: auto |
+| 3 | Button | `btnAddSfParam` | Button | Label: `+ Add parameter`, variant: outline, visible: `{{!components.sfParamsMode.value}}` |
+| 4 | Dropdown | `sfInsertPlaceholder` | Dropdown | Label: `Insert placeholder`, options: see Date Placeholders below (value = placeholder text), visible: `{{!components.sfParamsMode.value}}` |
+| 5 | Code Editor | `sfParamsRaw` | Code Editor | Mode: JSON, visible: `{{components.sfParamsMode.value}}`, default: built from `variables.schedulerParamRows` |
+
+**Row children (per row):**
+
+| # | Component | Properties |
+|---|---|---|
+| Text Input | Value: `{{listItem.key}}`, on blur → `sfUpdateParam` with `{id: listItem.id, field:'key', value}` |
+| Dropdown | Options: `[{label:'String',value:'string'},{label:'Number',value:'number'},{label:'Boolean',value:'boolean'},{label:'Date',value:'date'},{label:'JSON',value:'json'}]`, value: `{{listItem.type}}` |
+| Dynamic value input (switched by `listItem.type`) | See page 04 Test tab row children — same pattern |
+| Button | Label: `🗑`, variant: ghost → `sfDeleteParam` |
+
+#### Helpers
+
+**`sfLoadParamsForEdit` (on modal show)** — parses the stored JSON string back into rows:
+
+```javascript
+const raw = variables.editSchedulerData.parameters;
+if (!raw) { await actions.setVariable('schedulerParamRows', []); return; }
+
+let obj;
+try { obj = typeof raw === 'string' ? JSON.parse(raw) : raw; }
+catch (e) { obj = {}; }
+
+const rows = Object.entries(obj).map(([k, v]) => {
+  let type = 'string';
+  const isPlaceholder = typeof v === 'string' && /\{\{[A-Z_]+\}\}/.test(v);
+  if (typeof v === 'number') type = 'number';
+  else if (typeof v === 'boolean') type = 'boolean';
+  else if (typeof v === 'object' && v !== null) type = 'json';
+  else if (isPlaceholder && /DATE|DAY|TODAY|YESTERDAY|MONTH|WEEK|YEAR/.test(v)) type = 'date';
+  return { id: Date.now() + '_' + Math.random(), key: k, type, value: v };
+});
+await actions.setVariable('schedulerParamRows', rows);
+```
+
+**`sfUpdateParam`, `sfDeleteParam`, `btnAddSfParam`** — identical pattern to `tpUpdateParam` / `tpDeleteParam` / `btnAddTestParam` on page 04, but writing to `schedulerParamRows` instead.
+
+**`sfInsertPlaceholder` on select** — appends the picked placeholder token to the **last focused** Text Input / Date value cell. Simpler alternative: copy the token to clipboard and show a toast "Placeholder copied — paste into a value field".
+
+**`sfBuildParametersJSON` (JavaScript — called on save)** — returns a **JSON string** because the DB column is `varchar`:
+
+```javascript
+if (components.sfParamsMode.value) {
+  // Raw mode: validate then passthrough
+  try {
+    JSON.parse(components.sfParamsRaw.value || '{}');
+    return components.sfParamsRaw.value || '{}';
+  } catch (e) {
+    throw new Error('Invalid JSON in parameters: ' + e.message);
+  }
+}
+
+const out = {};
+for (const row of (variables.schedulerParamRows || [])) {
+  if (!row.key) continue;
+  let v = row.value;
+  if (typeof v === 'string' && /\{\{[A-Z_]+\}\}/.test(v)) {
+    // Keep placeholders as strings even if type is Date/Number — resolver handles them at run time
+    out[row.key] = v;
+    continue;
+  }
+  switch (row.type) {
+    case 'number':  v = Number(v); break;
+    case 'boolean': v = v === true || v === 'true'; break;
+    case 'json':    v = typeof v === 'string' ? JSON.parse(v || 'null') : v; break;
+    default:        v = String(v ?? '');
+  }
+  out[row.key] = v;
+}
+return JSON.stringify(out);
+```
+
+---
+
+### Cron Preset Dropdown
+
+`sfCronPreset` options (apply the selected preset into `sfCron`):
+
+```javascript
+[
+  {label: '— Custom —',               value: ''},
+  {label: 'Daily at 07:00',           value: '0 7 * * *'},
+  {label: 'Daily at 09:00',           value: '0 9 * * *'},
+  {label: 'Weekdays 09:00',           value: '0 9 * * 1-5'},
+  {label: 'Monday 09:00',             value: '0 9 * * 1'},
+  {label: 'First day of month 08:00', value: '0 8 1 * *'},
+  {label: 'Every hour (on the hour)', value: '0 * * * *'},
+  {label: 'Every 15 minutes',         value: '*/15 * * * *'},
+]
+```
+
+**`sfCronPreset` on change:**
+
+| Event | Action |
+|---|---|
+| On select | If value not empty: `setComponentValue(sfCron, value)` → Run `sfPreviewNextRuns` |
+
+**`sfCron` on change:**
+
+| Event | Action |
+|---|---|
+| On change (debounce 300ms) | Run `sfPreviewNextRuns`. Also if value no longer matches the preset → set `sfCronPreset` to `''` (Custom) |
+
+**`sfPreviewNextRuns` (JavaScript)** — computes the next 3 run times in the chosen timezone.
+
+```javascript
+// Minimal cron matcher (minute hour dom month dow). No seconds, no special chars beyond * / , -
+function matchField(val, part) {
+  if (part === '*') return true;
+  return part.split(',').some(seg => {
+    let step = 1, range = seg;
+    if (seg.includes('/')) { [range, step] = seg.split('/'); step = Number(step); }
+    if (range === '*') return val % step === 0;
+    if (range.includes('-')) {
+      const [lo, hi] = range.split('-').map(Number);
+      return val >= lo && val <= hi && ((val - lo) % step === 0);
+    }
+    return Number(range) === val;
+  });
+}
+
+function nextRuns(cron, tz, count = 3) {
+  const parts = (cron || '').trim().split(/\s+/);
+  if (parts.length !== 5) return [];
+  const [m, h, dom, mon, dow] = parts;
+  const out = [];
+  // Scan forward minute-by-minute up to 1 year (525,600 iterations worst case) — fine in JS
+  let d = new Date();
+  d.setSeconds(0, 0); d.setMinutes(d.getMinutes() + 1);
+  const end = new Date(d.getTime() + 366 * 24 * 60 * 60 * 1000);
+  while (d < end && out.length < count) {
+    const local = new Date(d.toLocaleString('en-US', {timeZone: tz}));
+    if (
+      matchField(local.getMinutes(), m) &&
+      matchField(local.getHours(), h) &&
+      matchField(local.getDate(), dom) &&
+      matchField(local.getMonth() + 1, mon) &&
+      matchField(local.getDay(), dow)
+    ) {
+      out.push(local.toLocaleString('sv-SE', {timeZone: tz}).slice(0, 16));
+    }
+    d = new Date(d.getTime() + 60 * 1000);
+  }
+  return out;
+}
+
+return nextRuns(components.sfCron.value, components.sfTimezone.value || 'Asia/Ho_Chi_Minh', 3);
+```
+
+On success → `setVariable('cronNextRuns', data)`. On empty/invalid → return `[]` so the hint text falls back to the placeholder message.
+
+> **Trade-off:** the inline matcher is ~25 lines and covers the common cases (ranges, steps, lists). If you need special tokens like `L`, `W`, `#`, bundle `cron-parser` as a ToolJet library dependency instead.
 
 **Timezone dropdown options** (common timezones):
 
@@ -312,11 +503,10 @@ Same columns as Q3, plus `updated_at` = `{{new Date().toISOString()}}`.
 ]
 ```
 
-**`btnSaveScheduler` event:**
+**`btnSaveScheduler` event chain:**
 
-| Event | Action |
-|---|---|
-| On click | If `isEditing`: run `updateScheduler`. Else: run `createScheduler` |
+1. Run `sfBuildParametersJSON` — validates + stringifies parameters. On failure → show the error alert and stop.
+2. If `isEditing`: run `updateScheduler`. Else: run `createScheduler`.
 
 **`btnCancelScheduler` event:**
 

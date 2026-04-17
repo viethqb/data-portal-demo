@@ -110,7 +110,7 @@ pyDBAPI (backend security)          ToolJet (frontend permissions)
 | `template_id` | varchar | Which template |
 | `template_name` | varchar | Template name (snapshot) |
 | `execution_id` | varchar | pyDBAPI execution ID |
-| `parameters` | jsonb | Filters used |
+| `parameters` | varchar | JSON string — filters used |
 | `status` | varchar | pending / success / failed |
 | `created_at` | timestamp | When exported |
 
